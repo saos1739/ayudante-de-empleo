@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} · Radar de Empleo{% endblock %}
+{% block content %}
+{% set sc = score_of(job) %}
+{% set an = job.ai_json|fromjson %}
+{% set rs = job.rule_reasons|fromjson or [] %}
+{% set ex = job.extra|fromjson or {} %}
+{% set alts = job.alt_urls|fromjson or [] %}
+{% set qs = job.questions|fromjson or [] %}
+
+<a class="back" href="{{ back }}">← Volver</a>
+
+<section class="detail-head">
+  <div class="score big {{ 'hi' if sc >= 70 else 'mid' if sc >= 50 else 'lo' }}">{{ sc }}<small>{{ 'IA' if job.ai_score is not none else 'reglas' }}</small></div>
+  <div>
+    <h1>{{ job.title }}</h1>
+    <div class="job-meta">
+      <span>{{ job.company or 'Empresa no informada' }}</span>
+      {% if job.location %}<span>📍 {{ job.location }}</span>{% endif %}
+      {% if job.modality %}<span>{{ job.modality }}</span>{% endif %}
+      {% if job.salary %}<span>💰 {{ job.salary }}</span>{% endif %}
+      <span class="src">{{ job.source }}</span>
+      <span>Publicada {{ (job.published_at or job.found_at)|ago }}</span>
+      {% if ex.postulantes %}<span>{{ ex.postulantes }} postulantes</span>{% endif %}
+    </div>
+    <div class="status-bar">
+      <a class="btn primary" href="{{ job.url }}" target="_blank" rel="noopener">Abrir aviso en {{ job.source }} ↗</a>
+      {% for a in alts %}<a class="btn" href="{{ a.url }}" target="_blank" rel="noopener">También en {{ a.source }} ↗</a>{% endfor %}
+      <form method="post" action="{{ url_for('job_status', job_id=job.id) }}" class="status-form">
+        {% for key, label in ESTADOS.items() %}
+          <button name="estado" value="{{ key }}" class="btn status-btn {{ 'current' if job.status == key }}">{{ label }}</button>
+        {% endfor %}
+      </form>
+    </div>
+  </div>
+</section>
+
+{% if job.excluded %}<div class="flash error">El filtro automático descartó esta oferta: {{ job.exclude_reason }}</div>{% endif %}
+
+<div class="detail-grid">
+  <div class="col">
+    <section class="card" id="ia">
+      <div class="card-head">
+        <h2>Análisis</h2>
+        {% if ai_ready %}
+        <form method="post" action="{{ url_for('job_analyze', job_id=job.id) }}" class="js-loading">
+          <button class="btn small">{{ '↻ Reanalizar' if an else '✨ Analizar con IA' }}</button>
+        </form>
+        {% endif %}
+      </div>
+      {% if an %}
+        <p><span class="verdict {{ an.veredicto }}">{{ an.veredicto }}</span> {{ an.resumen }}</p>
+        <p class="muted small">Seniority real: <b>{{ an.seniority_real }}</b>{% if an.modalidad %} · {{ an.modalidad }}{% endif %}</p>
+        {% if an.a_favor %}<h4>A favor</h4><ul class="pos-list">{% for x in an.a_favor %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+        {% if an.en_contra %}<h4>En contra</h4><ul class="neg-list">{% for x in an.en_contra %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+        {% if an.requisitos_faltantes %}<h4>Requisitos que no figuran en tu CV</h4><ul class="neg-list">{% for x in an.requisitos_faltantes %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+        {% if an.consejo %}<div class="tip">💡 {{ an.consejo }}</div>{% endif %}
+      {% endif %}
+      <h4>Puntaje por reglas: {{ job.rule_score }}</h4>
+      <ul class="reasons">
+        {% for r in rs %}
+          <li class="{{ 'pos' if r.p and r.p > 0 else 'neg' if (r.p and r.p < 0) or r.p is none else '' }}">
+            <span class="pts">{{ ('+' ~ r.p) if r.p and r.p > 0 else r.p if r.p else '·' }}</span> {{ r.t }}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="card" id="carta">
+      <div class="card-head">
+        <h2>Postulación</h2>
+        <form method="post" action="{{ url_for('job_letter', job_id=job.id) }}" class="js-loading row-gap">
+          {% if ai_ready %}<button class="btn small" name="modo" value="ia">✨ {{ 'Regenerar' if job.cover_letter else 'Generar' }} carta con IA</button>{% endif %}
+          <button class="btn small ghost" name="modo" value="plantilla">Usar plantilla</button>
+        </form>
+      </div>
+      {% if job.cover_letter %}
+        <form method="post" action="{{ url_for('job_letter_save', job_id=job.id) }}">
+          <label class="lbl">Carta de presentación {% if job.letter_by_ai %}<span class="muted small">(IA: revisala antes de enviar)</span>{% endif %}
+            <button type="button" class="btn tiny js-copy" data-target="carta-txt">Copiar</button></label>
+          <textarea name="carta" id="carta-txt" rows="16">{{ job.cover_letter }}</textarea>
+          <label class="lbl">Mensaje para el recruiter (LinkedIn)
+            <button type="button" class="btn tiny js-copy" data-target="msg-txt">Copiar</button></label>
+          <textarea name="mensaje" id="msg-txt" rows="4">{{ job.recruiter_msg }}</textarea>
+          <button class="btn">Guardar cambios</button>
+        </form>
+        {% if qs %}
+          <h4>Preguntas probables en la entrevista</h4>
+          {% for item in qs %}
+            <details class="qa"><summary>{{ item.pregunta }}</summary><p>{{ item.respuesta }}</p></details>
+          {% endfor %}
+        {% endif %}
+      {% else %}
+        <p class="muted">Generá una carta para preparar la postulación.</p>
+      {% endif %}
+      <div class="steps">
+        <h4>Pasos para postularte</h4>
+        <ol>
+          <li>Leé el aviso completo y confirmá zona, horario y requisitos excluyentes.</li>
+          <li>Generá la carta, <b>revisala y ajustala</b> con tus palabras.</li>
+          <li>Postulate desde <a href="{{ job.url }}" target="_blank" rel="noopener">el aviso</a> adjuntando tu CV en PDF.</li>
+          <li>Buscá en LinkedIn al recruiter o al líder técnico de {{ job.company or 'la empresa' }} y mandale el mensaje corto.</li>
+          <li>Marcá la oferta como <b>Postulé</b> acá para llevar el seguimiento.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="card" id="notas">
+      <h2>Notas</h2>
+      <form method="post" action="{{ url_for('job_notes', job_id=job.id) }}">
+        <textarea name="notas" rows="4" placeholder="Ej: me contactó Laura de RRHH el 25/10, entrevista el jueves…">{{ job.notes }}</textarea>
+        <button class="btn">Guardar notas</button>
+      </form>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card">
+      <h2>Descripción del aviso</h2>
+      {% if job.description %}
+        <div class="desc">{{ job.description }}</div>
+      {% else %}
+        <p class="muted">El portal no devolvió la descripción. Abrí el aviso para leerlo completo.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

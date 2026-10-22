@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Radar de Empleo{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{{ url_for('index') }}"><span class="dot"></span> Radar de Empleo</a>
+  <nav>
+    <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint in ('index','job_detail') }}">Ofertas</a>
+    <a href="{{ url_for('config_view') }}" class="{{ 'active' if request.endpoint == 'config_view' }}">Configuración</a>
+  </nav>
+  <div class="run-box" id="runBox" data-running="{{ 1 if running else 0 }}">
+    <span class="run-status" id="runStatus">
+      {% if running %}Buscando…{% elif last_run %}Última búsqueda: {{ last_run.finished_at|ago }} · {{ last_run.new }} nuevas{% else %}Todavía no se buscó{% endif %}
+    </span>
+    <form method="post" action="{{ url_for('search_now') }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button class="btn primary" id="runBtn" {{ 'disabled' if running }}>⟳ Buscar ahora</button>
+    </form>
+  </div>
+</header>
+
+<div class="log-panel" id="logPanel" hidden><pre id="logText"></pre></div>
+
+<main class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+  {% endwith %}
+  {% if not ai_ready and request.endpoint != 'config_view' %}
+    <div class="flash info">La IA está desactivada. Funciona igual con puntaje por reglas, pero para análisis y cartas a medida
+      <a href="{{ url_for('config_view') }}#ia">cargá tu clave gratuita de Gemini</a>.</div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

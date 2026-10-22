@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Configuración · Radar de Empleo{% endblock %}
+{% block content %}
+<h1>Configuración</h1>
+
+<div class="detail-grid">
+  <div class="col">
+    <section class="card">
+      <h2>Búsqueda</h2>
+      <form method="post">
+        <input type="hidden" name="accion" value="busqueda">
+        <label class="lbl">Palabras clave (una por línea)</label>
+        <textarea name="palabras" rows="11">{{ cfg.busqueda.palabras_clave|join('\n') }}</textarea>
+
+        <label class="lbl">Fuentes activas</label>
+        <div class="checks">
+          {% for name, cls in all_sources.items() %}
+            <label><input type="checkbox" name="fuentes" value="{{ name }}" {{ 'checked' if name in cfg.busqueda.fuentes_activas }}> {{ cls.label }}</label>
+          {% endfor %}
+        </div>
+
+        <div class="row">
+          <label class="lbl">Buscar automáticamente cada (horas, 0 = nunca)
+            <input type="number" name="intervalo" value="{{ cfg.busqueda.intervalo_horas }}" min="0" step="0.5"></label>
+          <label class="lbl">Páginas por palabra clave
+            <input type="number" name="paginas" value="{{ cfg.busqueda.paginas_por_palabra }}" min="1" max="5"></label>
+          <label class="lbl">Puntaje mínimo para mostrar
+            <input type="number" name="minimo" value="{{ cfg.filtros.puntaje_minimo_visible }}" min="0" max="100" step="5"></label>
+        </div>
+
+        <label class="lbl">Descartar si el título contiene (una por línea)</label>
+        <textarea name="excluir" rows="6">{{ cfg.filtros.excluir_titulo|join('\n') }}</textarea>
+        <p class="muted small">Los filtros de zona y tecnologías se ajustan en <code>config.json</code>.</p>
+        <button class="btn primary">Guardar y recalcular</button>
+      </form>
+    </section>
+
+    <section class="card" id="ia">
+      <h2>Inteligencia artificial (Gemini)</h2>
+      <p class="muted small">
+        Clave gratuita en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.
+        Se guarda solo en tu PC (archivo <code>.env</code>, excluido de Git).
+        Estado: <b>{{ 'clave cargada ✔' if has_key else 'sin clave' }}</b>
+      </p>
+      <form method="post">
+        <input type="hidden" name="accion" value="ia">
+        <label class="lbl">Clave de API {{ '(dejá vacío para mantener la actual)' if has_key }}
+          <input type="password" name="clave" placeholder="AIza…" autocomplete="off"></label>
+        <div class="checks">
+          <label><input type="checkbox" name="habilitada" {{ 'checked' if cfg.ia.habilitada }}> IA habilitada</label>
+          <label><input type="checkbox" name="auto" {{ 'checked' if cfg.ia.analizar_automaticamente }}> Analizar automáticamente las mejores después de cada búsqueda</label>
+          {% if has_key %}<label><input type="checkbox" name="borrar_clave" value="1"> Borrar la clave guardada</label>{% endif %}
+        </div>
+        <div class="row">
+          <label class="lbl">Máx. análisis por búsqueda
+            <input type="number" name="max_ia" value="{{ cfg.ia.max_analisis_por_busqueda }}" min="0" max="50"></label>
+          <label class="lbl">Analizar sólo si el puntaje por reglas es ≥
+            <input type="number" name="min_ia" value="{{ cfg.ia.puntaje_minimo_para_ia }}" min="0" max="100" step="5"></label>
+        </div>
+        <button class="btn primary">Guardar</button>
+      </form>
+    </section>
+
+    {% set n = cfg.notificaciones or {} %}
+    <section class="card" id="correo">
+      <h2>Correo: resumen diario de ofertas</h2>
+      <p class="muted small">
+        Se envía desde tu Gmail con una <b>contraseña de aplicación</b>
+        (<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com/apppasswords</a>),
+        no con tu contraseña normal. Se guarda solo en <code>.env</code> (excluido de Git).
+        Estado: <b>{{ 'configurado ✔' if mail_ok else 'sin configurar' }}</b>
+        {% if last_digest %} · Último resumen: {{ last_digest }}{% endif %}
+      </p>
+      <form method="post">
+        <input type="hidden" name="accion" value="correo">
+        <div class="row">
+          <label class="lbl">Tu Gmail (remitente)
+            <input type="email" name="gmail_user" value="{{ gmail_user }}" placeholder="tu@gmail.com"></label>
+          <label class="lbl">Contraseña de aplicación {{ '(vacío = mantener)' if mail_ok }}
+            <input type="password" name="gmail_pass" placeholder="xxxx xxxx xxxx xxxx" autocomplete="off"></label>
+        </div>
+        <div class="row">
+          <label class="lbl">Enviar a
+            <input type="email" name="destinatario" value="{{ n.destinatario or gmail_user }}"></label>
+          <label class="lbl">Hora del resumen (0–23)
+            <input type="number" name="hora" value="{{ n.hora_resumen or 8 }}" min="0" max="23"></label>
+          <label class="lbl">Avisar si el puntaje es ≥
+            <input type="number" name="minimo_email" value="{{ n.puntaje_minimo_email or 60 }}" min="0" max="100" step="5"></label>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" name="habilitado" {{ 'checked' if n.get('email_habilitado', True) }}> Resumen diario activado</label>
+          <label><input type="checkbox" name="vacio" {{ 'checked' if n.enviar_si_no_hay_novedades }}> Mandar mail aunque no haya novedades</label>
+        </div>
+        <button class="btn primary">Guardar</button>
+      </form>
+      {% if mail_ok %}
+      <form method="post" style="display:inline"><input type="hidden" name="accion" value="correo_prueba">
+        <button class="btn">Enviar correo de prueba</button></form>
+      <form method="post" style="display:inline"><input type="hidden" name="accion" value="correo_ahora">
+        <button class="btn">Enviar resumen ahora</button></form>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card">
+      <h2>Tu CV (fuente de verdad para la IA)</h2>
+      <p class="muted small">La IA solo afirma lo que está acá. Si sumás un proyecto o curso, agregalo.</p>
+      <form method="post">
+        <input type="hidden" name="accion" value="cv">
+        <textarea name="cv" rows="34" class="mono">{{ cv }}</textarea>
+        <button class="btn primary">Guardar CV</button>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}

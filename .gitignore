@@ -1,0 +1,21 @@
+# Entorno y claves
+.env
+.env.local
+
+# Base de datos y datos locales
+data/
+*.db
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.venv/
+env/
+venv/
+
+# Logs y temporales
+*.log
+scratch/
+.system_generated/

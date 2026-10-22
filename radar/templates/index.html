@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="tabs">
+  {% for key, label in tabs %}
+    <a href="{{ url_for('index', estado=key, fuente=source, min=min_score, orden=order) }}" class="tab {{ 'active' if status == key }}">
+      {{ label }} <span class="count">{{ counts.get(key, 0) }}</span>
+    </a>
+  {% endfor %}
+  <a href="{{ url_for('index', estado='filtradas', fuente=source) }}" class="tab muted {{ 'active' if status == 'filtradas' }}"
+     title="Ofertas que el filtro descartó automáticamente (senior, fuera de zona, no técnicas…)">
+    Filtradas automáticamente <span class="count">{{ counts.get('_excluidas', 0) }}</span>
+  </a>
+</div>
+
+<form class="filters" method="get">
+  <input type="hidden" name="estado" value="{{ status }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Buscar por puesto, empresa o tecnología…">
+  <select name="fuente">
+    <option value="">Todas las fuentes</option>
+    {% for s in sources %}<option value="{{ s }}" {{ 'selected' if s == source }}>{{ s }}</option>{% endfor %}
+  </select>
+  {% if status != 'filtradas' %}
+  <label class="inline">Puntaje mín.
+    <input type="number" name="min" value="{{ min_score }}" min="0" max="100" step="5">
+  </label>
+  {% endif %}
+  <select name="orden">
+    <option value="score" {{ 'selected' if order == 'score' }}>Mejor puntaje</option>
+    <option value="fecha" {{ 'selected' if order == 'fecha' }}>Más recientes</option>
+  </select>
+  <button class="btn">Filtrar</button>
+</form>
+
+{% if not jobs %}
+  <div class="empty">
+    {% if status == 'nueva' and counts.get('_total', 0) == 0 %}
+      <h3>Todavía no hay ofertas</h3>
+      <p>Tocá <b>⟳ Buscar ahora</b>. La primera búsqueda tarda unos minutos porque revisa todas las fuentes.</p>
+    {% else %}
+      <p>No hay ofertas en esta vista.</p>
+    {% endif %}
+  </div>
+{% endif %}
+
+<div class="job-list">
+{% for job in jobs %}
+  {% set sc = score_of(job) %}
+  {% set an = job.ai_json|fromjson %}
+  <article class="job-card" data-id="{{ job.id }}">
+    <div class="score {{ 'hi' if sc >= 70 else 'mid' if sc >= 50 else 'lo' }}" title="{{ 'Puntaje IA' if job.ai_score is not none else 'Puntaje por reglas' }}">
+      {{ sc }}<small>{{ 'IA' if job.ai_score is not none else '' }}</small>
+    </div>
+    <div class="job-main">
+      <a class="job-title" href="{{ url_for('job_detail', job_id=job.id, back=request.full_path) }}">{{ job.title }}</a>
+      <div class="job-meta">
+        <span>{{ job.company or 'Empresa no informada' }}</span>
+        {% if job.location %}<span>📍 {{ job.location }}</span>{% endif %}
+        {% if job.modality %}<span>{{ job.modality }}</span>{% endif %}
+        <span class="src">{{ job.source }}</span>
+        <span>{{ (job.published_at or job.found_at)|ago }}</span>
+      </div>
+      {% if status == 'filtradas' %}
+        <div class="job-why bad">{{ job.exclude_reason }}</div>
+      {% elif an and an.resumen %}
+        <div class="job-why"><span class="verdict {{ an.veredicto }}">{{ an.veredicto }}</span> {{ an.resumen }}</div>
+      {% else %}
+        {% set rs = job.rule_reasons|fromjson %}
+        <div class="job-why">{% for r in rs[:3] %}<span class="chip {{ 'pos' if r.p and r.p > 0 else 'neg' if r.p and r.p < 0 else '' }}">{{ r.t }}</span>{% endfor %}</div>
+      {% endif %}
+    </div>
+    <div class="job-actions">
+      <a class="btn small" href="{{ job.url }}" target="_blank" rel="noopener">Ver aviso ↗</a>
+      {% if status != 'filtradas' %}
+        {% if job.status != 'interesa' %}<button class="btn small good js-status" data-status="interesa">★ Me interesa</button>{% endif %}
+        {% if job.status != 'descartada' %}<button class="btn small ghost js-status" data-status="descartada">✕</button>{% else %}<button class="btn small ghost js-status" data-status="nueva">↺</button>{% endif %}
+      {% endif %}
+    </div>
+  </article>
+{% endfor %}
+</div>
+{% endblock %}
