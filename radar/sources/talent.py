@@ -1,7 +1,6 @@
 """Talent.com Argentina (https://ar.talent.com): agregador masivo de vacantes."""
 
 import re
-from datetime import datetime
 
 from bs4 import BeautifulSoup
 

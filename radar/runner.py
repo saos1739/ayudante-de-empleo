@@ -1,5 +1,6 @@
 """Orquestador de búsquedas: recorre fuentes, filtra, puntúa, guarda y lanza el análisis con IA."""
 
+import sys
 import threading
 import time
 import traceback
@@ -10,8 +11,6 @@ from . import ai, db, scoring
 from .config import load_config
 from .sources import ALL_SOURCES
 from .util import pause
-
-import sys
 
 _lock = threading.Lock()
 STATE = {
