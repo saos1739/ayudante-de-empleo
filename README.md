@@ -45,7 +45,7 @@ flowchart LR
     DB --> N["Notifiers<br>email · WhatsApp"]
     N --> M["Mail"]
     N --> W["WhatsApp<br>(CallMeBot)"]
-    GH["GitHub Actions<br>todos los días 8:17"] --> R
+    GH["GitHub Actions<br>todos los días 10:17"] --> R
     GH <--> ST["Rama radar-state<br>solo hashes de ofertas avisadas"]
 ```
 
@@ -123,7 +123,7 @@ El mensaje trae la fecha, las 5 ofertas de mejor puntaje (puntaje, etiqueta, tí
 
 ## ☁️ Uso en la nube (GitHub Actions)
 
-Para recibir los avisos **aunque tu PC esté apagada**, el workflow [`radar-diario.yml`](.github/workflows/radar-diario.yml) corre todos los días a las **8:17 (hora Argentina)** y también a mano desde *Actions → Radar diario → Run workflow*.
+Para recibir los avisos **aunque tu PC esté apagada**, el workflow [`radar-diario.yml`](.github/workflows/radar-diario.yml) corre todos los días a las **10:17 (hora Argentina)** y también a mano desde *Actions → Radar diario → Run workflow*.
 
 **Cómo activarlo**
 

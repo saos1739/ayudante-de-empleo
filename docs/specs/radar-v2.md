@@ -92,7 +92,7 @@ Usá estos datos para actualizar `perfil/cv.md` y las listas de stack del scorin
 
 - Modo sin panel: `python -m radar resumen --ci` (no abre navegador; los links al panel local no se incluyen en los avisos).
 - Workflow `.github/workflows/radar-diario.yml`:
-  - Programado todos los días a las 8:17 hora Argentina (`17 11 * * *` en UTC). Evitá el minuto 0: GitHub demora más los jobs programados a la hora en punto. Sumá `workflow_dispatch` para correrlo a mano.
+  - Programado todos los días a las 8:17 hora Argentina (hoy 10:17) (`17 11 * * *` en UTC; después se movió a las 10:17: `17 13 * * *`). Evitá el minuto 0: GitHub demora más los jobs programados a la hora en punto. Sumá `workflow_dispatch` para correrlo a mano.
   - Python 3.12 con caché de pip; `concurrency` para que no se pisen dos corridas; `permissions: contents: write` solo para guardar el estado.
   - Secrets: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `RADAR_DESTINATARIO`, `WHATSAPP_PHONE`, `CALLMEBOT_APIKEY` y `GEMINI_API_KEY` (opcional).
 - **Estado entre corridas:** cada corrida de GitHub arranca vacía. Guardá solo hashes de las ofertas ya avisadas (sin títulos ni el estado de mis postulaciones) en `notificados.json`, en una rama huérfana `radar-state`. Borrá entradas de más de 45 días.

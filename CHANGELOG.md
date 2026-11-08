@@ -5,7 +5,7 @@
 ### Agregado
 - **Avisos por WhatsApp** vía CallMeBot, junto al mail: las 5 ofertas de mejor puntaje, partidas en varios mensajes con pausa si es largo. Comando `python -m radar probar-whatsapp` y configuración desde el panel.
 - **Paquete `radar/notifiers/`** con una interfaz común (`Notificador.enviar(ofertas) -> Resultado`), los canales `email` y `whatsapp`, y el proveedor de WhatsApp separado del canal para sumar otro más adelante. Si un canal falla se sigue con el otro; una oferta queda avisada si llegó por al menos uno.
-- **Ejecución diaria en GitHub Actions** (`radar-diario.yml`, 8:17 hora Argentina): `python -m radar resumen --ci`, sin panel, con el estado de las ofertas ya avisadas (solo hashes, 45 días) en la rama huérfana `radar-state`.
+- **Ejecución diaria en GitHub Actions** (`radar-diario.yml`, 10:17 hora Argentina): `python -m radar resumen --ci`, sin panel, con el estado de las ofertas ya avisadas (solo hashes, 45 días) en la rama huérfana `radar-state`.
 - `busqueda.fuentes_ci` (LinkedIn desactivado), `notificaciones.modo` (`local` | `ci`) para no recibir avisos repetidos, y el resumen menciona las fuentes que fallaron.
 - **Etiqueta** «encaja» / «aplicá igual» y sus motivos en cada oferta, visibles en el mail y en WhatsApp.
 - **Tests y CI:** suite de pytest (reglas del scoring, mensajes, notifiers con SMTP/HTTP simulados, estado, workflows) que bloquea el acceso a internet, y `tests.yml` con `ruff` y `pytest` en cada push y PR.

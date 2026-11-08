@@ -24,10 +24,10 @@ def paso(pasos, nombre):
     return next(p for p in pasos if p.get("name") == nombre)
 
 
-def test_corre_todos_los_dias_a_las_8_17_de_argentina(workflow):
+def test_corre_todos_los_dias_a_las_10_17_de_argentina(workflow):
     disparadores = workflow.get("on") or workflow[True]  # YAML 1.1 lee «on» como True
     (programado,) = disparadores["schedule"]
-    assert programado["cron"] == "17 11 * * *"  # 11:17 UTC = 8:17 UTC-3
+    assert programado["cron"] == "17 13 * * *"  # 13:17 UTC = 10:17 UTC-3
 
 
 def test_evita_el_minuto_cero(workflow):

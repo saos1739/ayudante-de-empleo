@@ -5,8 +5,8 @@ name: Radar diario
 
 on:
   schedule:
-    # 8:17 hora Argentina (UTC-3). Se evita el minuto 0: GitHub demora más los jobs de la hora en punto.
-    - cron: "17 11 * * *"
+    # 10:17 hora Argentina (UTC-3). Se evita el minuto 0: GitHub demora más los jobs de la hora en punto.
+    - cron: "17 13 * * *"
   workflow_dispatch:
 
 # Dos corridas no se pisan: la segunda espera a que termine la primera.
