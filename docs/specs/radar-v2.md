@@ -6,7 +6,7 @@
 - [x] Fase 1: filtros alineados con mi perfil
 - [x] Fase 2: avisos por WhatsApp (pendiente: tu prueba real con `python -m radar probar-whatsapp`)
 - [x] Fase 3: ejecución diaria en GitHub Actions (pendiente: tus secrets, `modo: ci` y la corrida manual del workflow)
-- [ ] Fase 4: tests, CI y README
+- [x] Fase 4: tests, CI y README (tag v2.0.0)
 
 ## Objetivo
 
