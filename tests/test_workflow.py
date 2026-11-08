@@ -95,3 +95,29 @@ def test_solo_se_versiona_el_archivo_de_hashes_en_la_rama_de_estado(pasos):
 
 def test_la_carpeta_de_estado_esta_ignorada_en_main():
     assert ".estado/" in (RAIZ / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+
+@pytest.fixture(scope="module")
+def tests_yml():
+    return yaml.safe_load((RAIZ / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8"))
+
+
+class TestWorkflowDeTests:
+    def test_corre_en_cada_push_y_en_cada_pull_request(self, tests_yml):
+        disparadores = tests_yml.get("on") or tests_yml[True]
+        assert "push" in disparadores and "pull_request" in disparadores
+
+    def test_corre_ruff_y_pytest_con_python_3_12(self, tests_yml):
+        pasos = tests_yml["jobs"]["tests"]["steps"]
+        comandos = [p["run"] for p in pasos if "run" in p]
+        assert "ruff check ." in comandos
+        assert "python -m pytest -q" in comandos
+        python = next(p for p in pasos if str(p.get("uses", "")).startswith("actions/setup-python"))
+        assert python["with"]["python-version"] == "3.12"
+
+    def test_instala_las_dependencias_de_desarrollo(self, tests_yml):
+        comandos = [p["run"] for p in tests_yml["jobs"]["tests"]["steps"] if "run" in p]
+        assert "pip install -r requirements-dev.txt" in comandos
+
+    def test_solo_necesita_permiso_de_lectura(self, tests_yml):
+        assert tests_yml["permissions"] == {"contents": "read"}

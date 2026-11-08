@@ -1,4 +1,5 @@
 import shutil
+import socket
 
 import pytest
 
@@ -27,3 +28,15 @@ def panel(tmp_path, monkeypatch):
         monkeypatch.setenv(var, "")
     web.app.config["TESTING"] = True
     return web.app.test_client(), cfg_tmp, tmp_path / ".env"
+
+
+@pytest.fixture(autouse=True)
+def sin_internet(monkeypatch):
+    """Ningún test puede salir a internet: un pedido real falla en vez de pegarle a un portal, a Gemini o a CallMeBot."""
+
+    def bloqueado(*args, **kwargs):
+        raise RuntimeError("Los tests no pueden hacer pedidos a internet: simulá la respuesta con un mock.")
+
+    monkeypatch.setattr(socket.socket, "connect", bloqueado)
+    monkeypatch.setattr(socket.socket, "connect_ex", bloqueado)
+    monkeypatch.setattr(socket, "getaddrinfo", bloqueado)
