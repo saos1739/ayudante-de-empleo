@@ -100,6 +100,35 @@
         <button class="btn">Enviar resumen ahora</button></form>
       {% endif %}
     </section>
+
+    {% set canales = n.canales or ['email'] %}
+    <section class="card" id="whatsapp">
+      <h2>WhatsApp: avisos al celular</h2>
+      <p class="muted small">
+        Usa <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">CallMeBot</a>
+        (gratis, solo te manda mensajes a vos): activalo una vez desde tu WhatsApp y pegá acá la clave que te devuelve.
+        El teléfono y la clave se guardan solo en <code>.env</code> (excluido de Git).
+        Estado: <b>{{ 'configurado ✔ (' ~ wa_phone ~ ')' if wa_ok else 'sin configurar' }}</b>
+      </p>
+      <form method="post">
+        <input type="hidden" name="accion" value="whatsapp">
+        <div class="row">
+          <label class="lbl">Tu teléfono (con código de país) {{ '(vacío = mantener)' if wa_ok }}
+            <input type="tel" name="whatsapp_phone" placeholder="+54911XXXXXXXX" autocomplete="off"></label>
+          <label class="lbl">Clave de CallMeBot {{ '(vacío = mantener)' if wa_ok }}
+            <input type="password" name="callmebot_apikey" autocomplete="off"></label>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" name="canal_email" {{ 'checked' if 'email' in canales }}> Avisar por correo</label>
+          <label><input type="checkbox" name="canal_whatsapp" {{ 'checked' if 'whatsapp' in canales }}> Avisar por WhatsApp</label>
+        </div>
+        <button class="btn primary">Guardar</button>
+      </form>
+      {% if wa_ok %}
+      <form method="post" style="display:inline"><input type="hidden" name="accion" value="whatsapp_prueba">
+        <button class="btn">Enviar mensaje de prueba</button></form>
+      {% endif %}
+    </section>
   </div>
 
   <div class="col">

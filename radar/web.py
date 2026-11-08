@@ -229,12 +229,38 @@ def config_view():
             except Exception as e:
                 flash(f"Error al enviar el correo: {e}", "error")
             return redirect(url_for("config_view") + "#correo")
+        elif action in ("whatsapp", "whatsapp_prueba"):
+            from . import notifiers
+            from .notifiers.whatsapp import WhatsAppError
+            if action == "whatsapp":
+                telefono = request.form.get("whatsapp_phone", "").strip()
+                apikey = request.form.get("callmebot_apikey", "").strip()
+                if telefono:
+                    save_env_value("WHATSAPP_PHONE", telefono)
+                if apikey:
+                    save_env_value("CALLMEBOT_APIKEY", apikey)
+                canales = [c for c in ("email", "whatsapp") if request.form.get(f"canal_{c}")]
+                if canales:
+                    cfg.setdefault("notificaciones", {})["canales"] = canales
+                    save_config(cfg)
+                    flash("Configuración de WhatsApp guardada.", "ok")
+                else:
+                    flash("Elegí al menos un canal de aviso (correo o WhatsApp).", "error")
+            else:
+                try:
+                    notifiers.send_test("whatsapp")
+                    flash("Mensaje de prueba enviado. Revisá tu WhatsApp.", "ok")
+                except WhatsAppError as e:
+                    flash(f"Error al enviar por WhatsApp: {e}", "error")
+            return redirect(url_for("config_view") + "#whatsapp")
         return redirect(url_for("config_view"))
     from .notifiers import email as canal_email
+    from .notifiers.whatsapp import CallMeBot, enmascarar
     from .sources import ALL_SOURCES
     return render_template("config.html", cfg=cfg, all_sources=ALL_SOURCES, cv=load_cv(),
                            has_key=bool(gemini_key()), mail_ok=canal_email.configured(),
                            gmail_user=canal_email.gmail_user(), destinatario=destinatario(),
+                           wa_ok=CallMeBot().configurado(), wa_phone=enmascarar(CallMeBot.telefono()),
                            last_digest=db.get_meta("ultimo_resumen"))
 
 
