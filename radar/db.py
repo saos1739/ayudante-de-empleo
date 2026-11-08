@@ -130,21 +130,22 @@ def add_alt_url(job_id: int, source: str, url: str) -> None:
             )
 
 
-def insert_job(job: dict, score: dict) -> int:
+def insert_job(job: dict, score: dict, ya_avisada: bool = False) -> int:
+    """Guarda una oferta. `ya_avisada` la marca como notificada (se usa en CI, donde el estado viene de afuera)."""
     ts = now()
     with connect() as conn:
         cur = conn.execute(
             """INSERT INTO jobs (uid, source, title, company, location, modality, url, description,
                    salary, published_at, fingerprint, extra, found_at, last_seen_at, rule_score,
-                   rule_reasons, excluded, exclude_reason, etiqueta, status, status_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   rule_reasons, excluded, exclude_reason, etiqueta, status, status_at, notified_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 job["uid"], job["source"], job["title"], job.get("company"), job.get("location"),
                 job.get("modality"), job.get("url"), job.get("description"), job.get("salary"),
                 job.get("published_at"), job.get("fingerprint"),
                 json.dumps(job.get("extra", {}), ensure_ascii=False), ts, ts, score["score"],
                 json.dumps(score["reasons"], ensure_ascii=False), int(score["excluded"]),
-                score.get("exclude_reason"), score.get("etiqueta"), "nueva", ts,
+                score.get("exclude_reason"), score.get("etiqueta"), "nueva", ts, ts if ya_avisada else None,
             ),
         )
         return cur.lastrowid
@@ -251,11 +252,14 @@ def set_letter(job_id: int, letter: str, recruiter_msg: str, by_ai: bool, questi
             )
 
 
-def pending_ai(min_score: int, limit: int):
+def pending_ai(min_score: int, limit: int, sin_avisadas: bool = False):
+    """Ofertas a analizar con IA. `sin_avisadas` salta las que ya se avisaron (en CI no se vuelven a gastar
+    pedidos de la cuota gratuita en ofertas que ya llegaron)."""
     with connect() as conn:
         return conn.execute(
-            """SELECT * FROM jobs WHERE excluded = 0 AND ai_json IS NULL AND rule_score >= ?
-               AND status IN ('nueva', 'interesa') ORDER BY rule_score DESC, found_at DESC LIMIT ?""",
+            f"""SELECT * FROM jobs WHERE excluded = 0 AND ai_json IS NULL AND rule_score >= ?
+               AND status IN ('nueva', 'interesa'){" AND notified_at IS NULL" if sin_avisadas else ""}
+               ORDER BY rule_score DESC, found_at DESC LIMIT ?""",
             (min_score, limit),
         ).fetchall()
 

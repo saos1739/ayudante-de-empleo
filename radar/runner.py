@@ -49,7 +49,13 @@ def start_background(trigger: str = "manual") -> bool:
     return True
 
 
-def run_search(trigger: str = "manual") -> dict:
+def run_search(trigger: str = "manual", fuentes: list | None = None, ya_avisada=None, en_ci: bool = False) -> dict:
+    """Recorre las fuentes y guarda las ofertas nuevas.
+
+    `fuentes` pisa `busqueda.fuentes_activas` (CI usa `fuentes_ci`). `ya_avisada(job) -> bool` dice si una oferta
+    ya se avisó en una corrida anterior: se guarda como avisada y no se le pide el detalle ni se le gasta IA.
+    Una fuente que falla se registra y se saltea; el resultado trae `fuentes_fallidas` con sus nombres.
+    """
     if not _lock.acquire(blocking=False):
         log("Ya hay una búsqueda en curso.")
         return {}
@@ -62,17 +68,19 @@ def run_search(trigger: str = "manual") -> dict:
         min_visible = cfg["filtros"].get("puntaje_minimo_visible", 35)
         run_id = db.start_run(trigger)
         errors = []
+        fuentes_fallidas = []
         log(f"Búsqueda iniciada ({trigger}).")
 
-        for name in cfg["busqueda"]["fuentes_activas"]:
+        for name in fuentes if fuentes is not None else cfg["busqueda"]["fuentes_activas"]:
             cls = ALL_SOURCES.get(name)
             if not cls:
                 continue
-            source = cls(cfg, log)
-            STATE["source"] = source.label
-            log(f"→ {source.label}: buscando…")
+            label = getattr(cls, "label", name)
             found = new = 0
             try:
+                source = cls(cfg, log)
+                STATE["source"] = source.label
+                log(f"→ {source.label}: buscando…")
                 for job in source.search():
                     if not job or not job.get("title"):
                         continue
@@ -86,6 +94,9 @@ def run_search(trigger: str = "manual") -> dict:
                         db.add_alt_url(dup["id"], job["source"], job["url"])
                         continue
                     pre = scoring.evaluate(job, cfg)
+                    if ya_avisada and ya_avisada(job):
+                        db.insert_job(job, pre, ya_avisada=True)  # ya llegó antes: sin detalle, sin IA, sin aviso
+                        continue
                     # Sólo se pide el detalle de las que pasan el filtro por título/zona (ahorra pedidos).
                     if source.needs_detail and not pre["excluded"] and not job["description"]:
                         try:
@@ -100,27 +111,32 @@ def run_search(trigger: str = "manual") -> dict:
                     if not result["excluded"] and result["score"] >= min_visible:
                         STATE["relevant"] += 1
                 log(f"   {source.label}: {found} vistas, {new} nuevas.")
+                if not found:  # sin excepción pero sin nada: típico de un portal que bloquea la IP
+                    fuentes_fallidas.append(f"{label} (sin resultados)")
             except Exception as e:
-                msg = f"{source.label}: {e}"
+                msg = f"{label}: {e}"
                 errors.append(msg)
+                fuentes_fallidas.append(label)
                 log(f"   ⚠ {msg}")
                 traceback.print_exc()
 
         STATE["source"] = "IA"
-        _auto_analyze(cfg, errors)
+        _auto_analyze(cfg, errors, sin_avisadas=en_ci)
         db.finish_run(run_id, STATE["found"], STATE["new"], STATE["relevant"], errors)
         log(f"Listo: {STATE['new']} ofertas nuevas, {STATE['relevant']} relevantes para vos.")
-        return {"found": STATE["found"], "new": STATE["new"], "relevant": STATE["relevant"], "errors": errors}
+        return {"found": STATE["found"], "new": STATE["new"], "relevant": STATE["relevant"], "errors": errors,
+                "fuentes_fallidas": fuentes_fallidas}
     finally:
         STATE.update(running=False, source=None)
         _lock.release()
 
 
-def _auto_analyze(cfg: dict, errors: list) -> None:
+def _auto_analyze(cfg: dict, errors: list, sin_avisadas: bool = False) -> None:
     ia = cfg.get("ia", {})
     if not (ia.get("analizar_automaticamente") and ai.available()):
         return
-    pending = db.pending_ai(ia.get("puntaje_minimo_para_ia", 50), ia.get("max_analisis_por_busqueda", 12))
+    pending = db.pending_ai(ia.get("puntaje_minimo_para_ia", 50), ia.get("max_analisis_por_busqueda", 12),
+                            sin_avisadas=sin_avisadas)
     if not pending:
         return
     log(f"IA: analizando {len(pending)} ofertas prometedoras…")
