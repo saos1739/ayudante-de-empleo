@@ -1,0 +1,80 @@
+name: Radar diario
+
+# Busca ofertas y manda el resumen por mail y WhatsApp aunque tu PC esté apagada.
+# Para activarlo: cargá los secrets del repo y poné "modo": "ci" en notificaciones de config.json (ver README).
+
+on:
+  schedule:
+    # 8:17 hora Argentina (UTC-3). Se evita el minuto 0: GitHub demora más los jobs de la hora en punto.
+    - cron: "17 11 * * *"
+  workflow_dispatch:
+
+# Dos corridas no se pisan: la segunda espera a que termine la primera.
+concurrency:
+  group: radar-diario
+  cancel-in-progress: false
+
+# Escritura sólo para guardar el estado en la rama radar-state.
+permissions:
+  contents: write
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # El estado (hashes de ofertas ya avisadas) vive en la rama huérfana radar-state.
+      # Se monta en .estado/ con un worktree, que reutiliza la credencial del checkout.
+      - name: Traer el estado
+        run: |
+          set -euo pipefail
+          git worktree add --detach .estado
+          cd .estado
+          if git ls-remote --exit-code --heads origin radar-state > /dev/null; then
+            git fetch --depth=1 origin radar-state:refs/remotes/origin/radar-state
+            git checkout --quiet --detach origin/radar-state
+          else
+            echo "Primera corrida: se crea la rama radar-state."
+            git checkout --quiet --orphan radar-state
+            git rm -rf --quiet --ignore-unmatch .
+          fi
+
+      - name: Buscar y avisar
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RADAR_DESTINATARIO: ${{ secrets.RADAR_DESTINATARIO }}
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RADAR_DB: ${{ runner.temp }}/radar.db
+          RADAR_ESTADO: ${{ github.workspace }}/.estado/notificados.json
+        run: python -m radar resumen --ci
+
+      # Se guarda aunque el paso anterior falle: lo que ya se avisó no tiene que repetirse mañana.
+      - name: Guardar el estado
+        if: always()
+        run: |
+          set -euo pipefail
+          [ -d .estado ] || { echo "No se pudo traer el estado: nada que guardar."; exit 0; }
+          cd .estado
+          [ -f notificados.json ] || { echo "Sin estado todavía."; exit 0; }
+          git config user.name "radar-bot"
+          git config user.email "radar-bot@users.noreply.github.com"
+          git add notificados.json
+          if git diff --cached --quiet; then
+            echo "Estado sin cambios."
+          else
+            git commit --quiet -m "estado: $(date -u +%F)"
+            git push origin HEAD:radar-state
+          fi
