@@ -4,7 +4,7 @@
 
 - [x] Fase 0: repo presentable y sin datos personales
 - [x] Fase 1: filtros alineados con mi perfil
-- [ ] Fase 2: avisos por WhatsApp
+- [x] Fase 2: avisos por WhatsApp (pendiente: tu prueba real con `python -m radar probar-whatsapp`)
 - [ ] Fase 3: ejecución diaria en GitHub Actions
 - [ ] Fase 4: tests, CI y README
 
