@@ -7,6 +7,19 @@ data/
 *.db
 *.sqlite3
 
+# Datos personales: solo se versionan las versiones de ejemplo (*.example.md)
+perfil/cv.md
+perfil_candidato.md
+tracking_postulaciones.md
+postulaciones/*
+!postulaciones/*.example.md
+plantillas/*
+!plantillas/*.example.md
+
+# Herramientas de desarrollo
+.pytest_cache/
+.ruff_cache/
+
 # Python
 __pycache__/
 *.py[cod]
