@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     rule_reasons    TEXT DEFAULT '[]',
     excluded        INTEGER DEFAULT 0,
     exclude_reason  TEXT,
+    etiqueta        TEXT,
     ai_score        INTEGER,
     ai_json         TEXT,
     ai_at           TEXT,
@@ -80,6 +81,8 @@ def init_db() -> None:
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(jobs)")}
         if "notified_at" not in cols:  # migración: aviso por correo
             conn.execute("ALTER TABLE jobs ADD COLUMN notified_at TEXT")
+        if "etiqueta" not in cols:  # migración: etiqueta legible ("encaja" / "aplicá igual")
+            conn.execute("ALTER TABLE jobs ADD COLUMN etiqueta TEXT")
 
 
 def get_meta(key: str):
@@ -133,15 +136,15 @@ def insert_job(job: dict, score: dict) -> int:
         cur = conn.execute(
             """INSERT INTO jobs (uid, source, title, company, location, modality, url, description,
                    salary, published_at, fingerprint, extra, found_at, last_seen_at, rule_score,
-                   rule_reasons, excluded, exclude_reason, status, status_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   rule_reasons, excluded, exclude_reason, etiqueta, status, status_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 job["uid"], job["source"], job["title"], job.get("company"), job.get("location"),
                 job.get("modality"), job.get("url"), job.get("description"), job.get("salary"),
                 job.get("published_at"), job.get("fingerprint"),
                 json.dumps(job.get("extra", {}), ensure_ascii=False), ts, ts, score["score"],
                 json.dumps(score["reasons"], ensure_ascii=False), int(score["excluded"]),
-                score.get("exclude_reason"), "nueva", ts,
+                score.get("exclude_reason"), score.get("etiqueta"), "nueva", ts,
             ),
         )
         return cur.lastrowid
@@ -150,9 +153,9 @@ def insert_job(job: dict, score: dict) -> int:
 def update_rule_score(job_id: int, score: dict) -> None:
     with connect() as conn:
         conn.execute(
-            "UPDATE jobs SET rule_score=?, rule_reasons=?, excluded=?, exclude_reason=? WHERE id=?",
+            "UPDATE jobs SET rule_score=?, rule_reasons=?, excluded=?, exclude_reason=?, etiqueta=? WHERE id=?",
             (score["score"], json.dumps(score["reasons"], ensure_ascii=False),
-             int(score["excluded"]), score.get("exclude_reason"), job_id),
+             int(score["excluded"]), score.get("exclude_reason"), score.get("etiqueta"), job_id),
         )
 
 

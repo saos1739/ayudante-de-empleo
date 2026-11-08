@@ -58,12 +58,29 @@ def _score(job) -> int:
     return job["ai_score"] if job["ai_score"] is not None else job["rule_score"]
 
 
+def _etiqueta(job) -> str:
+    """«encaja» o «aplicá igual»; vacía en ofertas guardadas antes de la v2 hasta que se recalculen."""
+    return job["etiqueta"] or ""
+
+
 def _reasons(job, limit: int = 3) -> list:
+    """Los mejores motivos a favor y, aparte, todas las advertencias (penalizaciones) marcadas con ⚠."""
     try:
         items = json.loads(job["rule_reasons"] or "[]")
     except ValueError:
         return []
-    return [r["t"] for r in items if (r.get("p") or 0) > 0][:limit]
+    a_favor = [r["t"] for r in items if (r.get("p") or 0) > 0][:limit]
+    advertencias = [f"⚠ {r['t']}" for r in items if (r.get("p") or 0) < 0]
+    return a_favor + advertencias
+
+
+def _etiqueta_html(job) -> str:
+    etiqueta = _etiqueta(job)
+    if not etiqueta:
+        return ""
+    colores = "background:#fef3c7;color:#92400e" if etiqueta == "aplicá igual" else "background:#dbeafe;color:#1e40af"
+    return (f'<span style="display:inline-block;padding:2px 8px;margin-left:6px;border-radius:6px;'
+            f'{colores};font-size:12px;font-weight:600">{escape(etiqueta)}</span>')
 
 
 def _job_html(job) -> str:
@@ -75,6 +92,7 @@ def _job_html(job) -> str:
         <span style="display:inline-block;min-width:38px;padding:2px 6px;margin-right:6px;border-radius:6px;
               background:#dcfce7;color:#166534;font-size:13px;text-align:center">{_score(job)}</span>
         {escape(job["title"])}
+        {_etiqueta_html(job)}
       </div>
       <div style="color:#4b5563;font-size:13px;margin:4px 0">{meta} · <i>{escape(job["source"])}</i></div>
       <ul style="margin:6px 0 8px 18px;padding:0;color:#374151;font-size:13px">{reasons}</ul>
@@ -87,7 +105,8 @@ def _job_html(job) -> str:
 def _job_text(job) -> str:
     meta = " · ".join(x for x in (job["company"], job["location"], job["modality"], job["salary"]) if x)
     reasons = "\n".join(f"   - {r}" for r in _reasons(job))
-    return f"[{_score(job)}] {job['title']}\n   {meta} ({job['source']})\n{reasons}\n   {job['url']}\n"
+    etiqueta = f" ({_etiqueta(job)})" if _etiqueta(job) else ""
+    return f"[{_score(job)}]{etiqueta} {job['title']}\n   {meta} ({job['source']})\n{reasons}\n   {job['url']}\n"
 
 
 def pending_jobs(minimo: int):
