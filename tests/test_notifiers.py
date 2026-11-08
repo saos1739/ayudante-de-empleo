@@ -19,7 +19,7 @@ DESC = "Perfil junior con JavaScript y React. "
 def cfg(monkeypatch):
     """Config real con avisos sobre los dos canales; el orquestador la lee desde acá."""
     c = copy.deepcopy(json.loads(CONFIG_PATH.read_text(encoding="utf-8")))
-    c["notificaciones"].update({"email_habilitado": True, "canales": ["email", "whatsapp"],
+    c["notificaciones"].update({"modo": "local", "email_habilitado": True, "canales": ["email", "whatsapp"],
                                 "puntaje_minimo_email": 0, "enviar_si_no_hay_novedades": False})
     monkeypatch.setattr(notifiers, "load_config", lambda: c)
     return c

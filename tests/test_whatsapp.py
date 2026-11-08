@@ -255,7 +255,7 @@ class TestNotificador:
 class TestIntegracionConElOrquestador:
     @pytest.fixture
     def orquestador(self, cfg, monkeypatch):
-        cfg["notificaciones"].update({"email_habilitado": True, "puntaje_minimo_email": 0})
+        cfg["notificaciones"].update({"modo": "local", "email_habilitado": True, "puntaje_minimo_email": 0})
         monkeypatch.setattr(notifiers, "load_config", lambda: cfg)
         monkeypatch.setenv("GMAIL_USER", "")  # el correo queda sin configurar: sólo WhatsApp
         monkeypatch.setenv("GMAIL_APP_PASSWORD", "")
