@@ -201,3 +201,15 @@ def test_el_resumen_de_ci_funciona_sin_panel_ni_navegador(nube, monkeypatch):
     nube.fuentes["a"] = fuente("a", [oferta("1")])
     assert nube()["sent"]
     assert db.get_meta("ultimo_resumen")
+
+
+class TestSinSecrets:
+    def test_sin_ningun_canal_configurado_sale_en_rojo_para_que_se_note(self, nube, canal, monkeypatch, tmp_path):
+        monkeypatch.setattr(canal, "configurado", lambda self: False)
+        nube.fuentes["a"] = fuente("a", [oferta("1")])
+        monkeypatch.setenv("RADAR_DB", str(tmp_path / "radar_s.db"))
+        assert ci.main() == 1
+
+    def test_en_modo_local_la_corrida_omitida_no_es_un_error(self, cfg, canal, base):
+        cfg["notificaciones"]["modo"] = "local"
+        assert ci.main() == 0

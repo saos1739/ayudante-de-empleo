@@ -57,7 +57,12 @@ def resumen_ci(log=print) -> dict:
 
 
 def main() -> int:
-    """Punto de entrada de `resumen --ci`. Código de salida 1 si algún canal falló (así Actions avisa)."""
+    """Punto de entrada de `resumen --ci`.
+
+    Código de salida 1 si algún canal falló o si no hay ningún canal configurado (faltan los secrets):
+    así Actions queda en rojo y se nota, en vez de terminar «bien» sin mandar nada.
+    """
     resultado = resumen_ci()
     print({k: v for k, v in resultado.items() if k != "ids"})
-    return 1 if resultado["errores"] else 0
+    sin_canales = resultado["reason"] == "ningún canal configurado"
+    return 1 if resultado["errores"] or sin_canales else 0

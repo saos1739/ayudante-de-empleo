@@ -565,7 +565,7 @@
     "puntaje_minimo_para_ia": 50
   },
   "notificaciones": {
-    "modo": "local",
+    "modo": "ci",
     "canales": [
       "email"
     ],
