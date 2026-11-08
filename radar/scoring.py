@@ -11,11 +11,15 @@ from .util import norm
 # Tecnologías principales del CV de Santiago (las que definen si una oferta técnica le sirve).
 STACK_CORE = {
     "JavaScript": ["javascript", "js", "es6"],
+    "TypeScript": ["typescript", "ts"],
     "Node.js": ["node", "nodejs", "node.js"],
     "Express": ["express", "expressjs", "express.js"],
     "React": ["react", "reactjs", "react.js"],
+    "React Native": ["react native", "react-native", "reactnative"],
+    "Expo": ["expo"],
     "Python": ["python"],
     "Django": ["django"],
+    "Flask": ["flask"],
     "SQL": ["sql", "mysql", "postgres", "postgresql", "sqlite"],
     "HTML/CSS": ["html", "html5", "css", "css3", "bootstrap"],
     "APIs REST": ["api rest", "apis rest", "restful", "rest api"],
@@ -23,6 +27,7 @@ STACK_CORE = {
     "Google Cloud": ["gcp", "google cloud"],
     "Salesforce": ["salesforce", "trailhead"],
     "Datos/BI": ["power bi", "business intelligence", "pandas", "data analytics", "analisis de datos", "etl", "tableau", "looker"],
+    "scikit-learn": ["scikit-learn", "scikit learn", "sklearn"],
     "C# (básico)": ["c#"],
 }
 
@@ -36,12 +41,18 @@ STACK_COMPLEMENTARIO = {
 # Entradas del stack core que por sí solas no alcanzan para decir que la oferta es de desarrollo/datos/cloud.
 STACK_CORE_NO_PRIMARIO = ("APIs REST", "C# (básico)")
 
+# Jornada parcial o por proyecto: resta puntos pero no excluye (Santiago prefiere full time).
+JORNADA_PARCIAL = [
+    "part time", "part-time", "parttime", "medio tiempo", "jornada parcial", "jornada reducida",
+    "freelance", "freelancer",
+]
+
 REMOTO = ["remoto", "remote", "home office", "teletrabajo", "100% remoto", "fully remote"]
 
 # Tecnologías o rubros en el TÍTULO que descartan la oferta porque no son el perfil de Santiago
 TITULO_STACK_AJENO = [
     ".net", "vb.net", "asp.net", "java", "spring", "angular", "vue", "php", "laravel", "symfony",
-    "cobol", "golang", "ruby", "rails", "flutter", "android", "ios", "kotlin", "swift", "react native",
+    "cobol", "golang", "ruby", "rails", "flutter", "android", "ios", "kotlin", "swift",
     "sap", "abap", "hana", "genexus", "delphi", "wordpress", "drupal", "magento", "shopify", "odoo",
     "c++", "rust", "scala", "elixir", "mainframe", "as400", "rpg", "pl/sql", "oracle forms",
     "power platform", "power apps", "powerapps", "sharepoint", "dynamics", "microstrategy", "qlik",
@@ -335,6 +346,11 @@ def evaluate(job: dict, cfg: dict) -> dict:
         pts = min(9, 3 * len(foreign_desc))
         score -= pts
         add(-pts, "También mencionan: " + ", ".join(foreign_desc[:5]))
+
+    jornada = find_term(f"{title} {desc} {modality}", JORNADA_PARCIAL)
+    if jornada:
+        score -= 10
+        add(-10, f"Jornada parcial o freelance («{jornada}»): preferís full time")
 
     if is_remote:
         score += 10

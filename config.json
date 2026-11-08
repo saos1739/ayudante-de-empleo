@@ -13,6 +13,10 @@
         "js",
         "es6"
       ],
+      "TypeScript": [
+        "typescript",
+        "ts"
+      ],
       "Node.js": [
         "node",
         "nodejs",
@@ -28,11 +32,22 @@
         "reactjs",
         "react.js"
       ],
+      "React Native": [
+        "react native",
+        "react-native",
+        "reactnative"
+      ],
+      "Expo": [
+        "expo"
+      ],
       "Python": [
         "python"
       ],
       "Django": [
         "django"
+      ],
+      "Flask": [
+        "flask"
       ],
       "SQL": [
         "sql",
@@ -76,6 +91,11 @@
         "tableau",
         "looker"
       ],
+      "scikit-learn": [
+        "scikit-learn",
+        "scikit learn",
+        "sklearn"
+      ],
       "C# (básico)": [
         "c#"
       ]
@@ -100,7 +120,6 @@
       "ios",
       "kotlin",
       "swift",
-      "react native",
       "sap",
       "abap",
       "hana",
@@ -165,7 +184,13 @@
       "frontend junior",
       "react junior",
       "node junior",
-      "python junior"
+      "python junior",
+      "analista de datos junior",
+      "data analyst junior",
+      "analista bi junior",
+      "cloud junior",
+      "cloud engineer junior",
+      "devops junior"
     ],
     "fuentes_activas": [
       "getonbrd",
@@ -295,7 +320,9 @@
       "informatic",
       "tecnolog",
       "automatiz",
-      "ingenier"
+      "ingenier",
+      "bi",
+      "analytics"
     ],
     "senales_junior": [
       "junior",

@@ -46,3 +46,58 @@ class TestStackDesdeConfig:
         r = scoring.evaluate(aviso(titulo="Programador Fortran Jr", descripcion="Perfil junior, trainee. "), cfg)
         assert r["excluded"]
         assert "fortran" in r["exclude_reason"]
+
+
+class TestRegla1ReactNative:
+    def test_react_native_en_el_titulo_ya_no_excluye(self, cfg):
+        r = scoring.evaluate(
+            aviso(titulo="Desarrollador React Native Jr", descripcion="Perfil junior. Expo y TypeScript. "), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+
+    @pytest.mark.parametrize("tecnologia, nombre", [
+        ("React Native", "React Native"), ("TypeScript", "TypeScript"), ("Expo", "Expo"),
+        ("Flask", "Flask"), ("Pandas", "Datos/BI"), ("scikit-learn", "scikit-learn"),
+    ])
+    def test_suma_las_tecnologias_nuevas_al_stack_propio(self, cfg, tecnologia, nombre):
+        r = scoring.evaluate(aviso(descripcion=f"Perfil junior con {tecnologia}. "), cfg)
+        assert nombre in r["matched_stack"]
+
+    def test_react_native_no_figura_como_stack_ajeno(self, cfg):
+        assert "react native" not in cfg["perfil"]["stack_ajeno"]
+        assert "react native" not in scoring.TITULO_STACK_AJENO
+
+
+class TestRegla2PuestosObjetivo:
+    @pytest.mark.parametrize("palabra", [
+        "analista de datos junior", "data analyst junior", "analista bi junior",
+        "cloud junior", "cloud engineer junior", "devops junior",
+    ])
+    def test_palabras_clave_de_busqueda_incluyen_los_puestos_nuevos(self, cfg, palabra):
+        assert palabra in cfg["busqueda"]["palabras_clave"]
+
+    def test_se_mantienen_las_palabras_clave_full_stack(self, cfg):
+        assert "full stack junior" in cfg["busqueda"]["palabras_clave"]
+
+    @pytest.mark.parametrize("titulo, desc", [
+        ("Analista de Datos Jr", "Trabajo con Python, Pandas y SQL. "),
+        ("Analista BI Jr", "Armado de tableros en Power BI. "),
+        ("Cloud Engineer Jr", "Trabajo con AWS y Google Cloud. "),
+        ("DevOps Junior", "Pipelines y despliegues en AWS. "),
+    ])
+    def test_los_puestos_nuevos_no_se_filtran_como_no_tecnicos(self, cfg, titulo, desc):
+        r = scoring.evaluate(aviso(titulo=titulo, descripcion=desc), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+
+
+class TestRegla6Jornada:
+    @pytest.mark.parametrize("texto", ["Part time", "part-time", "Medio tiempo", "Freelance"])
+    def test_part_time_o_freelance_restan_sin_excluir(self, cfg, texto):
+        base = scoring.evaluate(aviso(descripcion=DESC_JS), cfg)
+        r = scoring.evaluate(aviso(descripcion=DESC_JS + f"Modalidad: {texto}. "), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+        assert r["score"] < base["score"]
+        assert any(m["p"] and m["p"] < 0 and "jornada" in m["t"].lower() for m in r["reasons"])
+
+    def test_full_time_no_resta(self, cfg):
+        r = scoring.evaluate(aviso(descripcion=DESC_JS + "Jornada full time. "), cfg)
+        assert not any("jornada" in m["t"].lower() for m in r["reasons"])
