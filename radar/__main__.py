@@ -22,16 +22,16 @@ def main() -> None:
         from . import runner
         runner.run_search("consola")
     elif cmd == "resumen":
-        from . import db, notify, runner
+        from . import db, notifiers, runner
         db.init_db()
         if db.get_meta("ultimo_resumen") == __import__("datetime").date.today().isoformat() and "--forzar" not in sys.argv:
             print("El resumen de hoy ya se envió.")
             return
         runner.run_search("resumen diario")
-        print(notify.send_digest(force="--forzar" in sys.argv))
+        print(notifiers.send_digest(force="--forzar" in sys.argv))
     elif cmd == "probar-mail":
-        from . import notify
-        notify.send_test()
+        from . import notifiers
+        notifiers.send_test("email")
         print("Correo de prueba enviado.")
     elif cmd == "recalcular":
         from . import db, runner

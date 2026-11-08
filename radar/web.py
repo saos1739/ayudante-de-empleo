@@ -202,7 +202,7 @@ def config_view():
             CV_PATH.write_text(request.form.get("cv", ""), encoding="utf-8")
             flash("CV actualizado. La IA usará esta versión.", "ok")
         elif action in ("correo", "correo_prueba", "correo_ahora"):
-            from . import notify
+            from . import notifiers
             if action == "correo":
                 user = request.form.get("gmail_user", "").strip()
                 pwd = request.form.get("gmail_pass", "").replace(" ", "").strip()
@@ -221,20 +221,20 @@ def config_view():
                 flash("Configuración de correo guardada.", "ok")
             try:
                 if action == "correo_prueba":
-                    notify.send_test()
+                    notifiers.send_test("email")
                     flash("Correo de prueba enviado. Revisá tu bandeja (y Spam).", "ok")
                 elif action == "correo_ahora":
-                    r = notify.send_digest(force=True)
+                    r = notifiers.send_digest(force=True)
                     flash(f"Resumen enviado con {r['count']} ofertas." if r["sent"] else f"No se envió: {r['reason']}.", "ok" if r["sent"] else "info")
             except Exception as e:
                 flash(f"Error al enviar el correo: {e}", "error")
             return redirect(url_for("config_view") + "#correo")
         return redirect(url_for("config_view"))
-    from . import notify
+    from .notifiers import email as canal_email
     from .sources import ALL_SOURCES
     return render_template("config.html", cfg=cfg, all_sources=ALL_SOURCES, cv=load_cv(),
-                           has_key=bool(gemini_key()), mail_ok=notify.configured(),
-                           gmail_user=notify.gmail_user(), destinatario=destinatario(),
+                           has_key=bool(gemini_key()), mail_ok=canal_email.configured(),
+                           gmail_user=canal_email.gmail_user(), destinatario=destinatario(),
                            last_digest=db.get_meta("ultimo_resumen"))
 
 

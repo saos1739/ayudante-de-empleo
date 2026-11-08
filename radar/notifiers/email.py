@@ -1,15 +1,16 @@
-"""Aviso por correo: resumen diario con las ofertas nuevas que encajan con el perfil (Gmail SMTP)."""
+"""Canal de correo: resumen diario con las ofertas nuevas que encajan con el perfil (Gmail SMTP)."""
 
 import json
 import os
 import smtplib
 import ssl
-from datetime import date, datetime
+from collections.abc import Sequence
+from datetime import datetime
 from email.message import EmailMessage
 from html import escape
 
-from . import db
-from .config import destinatario, load_config
+from ..config import destinatario
+from .base import Notificador, Resultado
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
@@ -109,47 +110,31 @@ def _job_text(job) -> str:
     return f"[{_score(job)}]{etiqueta} {job['title']}\n   {meta} ({job['source']})\n{reasons}\n   {job['url']}\n"
 
 
-def pending_jobs(minimo: int):
-    with db.connect() as conn:
-        return conn.execute(
-            """SELECT * FROM jobs
-               WHERE excluded = 0 AND notified_at IS NULL AND status IN ('nueva', 'interesa')
-                 AND COALESCE(ai_score, rule_score) >= ?
-               ORDER BY COALESCE(ai_score, rule_score) DESC, found_at DESC LIMIT 25""",
-            (minimo,),
-        ).fetchall()
+class EmailNotificador(Notificador):
+    nombre = "email"
 
+    def configurado(self) -> bool:
+        return configured()
 
-def send_digest(force: bool = False, log=print) -> dict:
-    """Envía el resumen con las ofertas aún no avisadas. Devuelve {'sent': bool, 'count': n, 'reason': str}."""
-    db.init_db()
-    cfg = load_config()
-    st = _settings(cfg)
-    if not st["habilitado"] and not force:
-        return {"sent": False, "count": 0, "reason": "avisos por correo deshabilitados"}
-    if not configured():
-        return {"sent": False, "count": 0, "reason": "correo sin configurar"}
+    def enviar(self, ofertas: Sequence) -> Resultado:
+        """Envía el resumen. Sin ofertas manda el aviso de «sin novedades» (el orquestador decide si corresponde)."""
+        st = _settings(self.cfg)
+        today = datetime.now().strftime("%d/%m/%Y")
+        n = len(ofertas)
+        if ofertas:
+            plural = "s" if n != 1 else ""
+            subject = f"Radar de Empleo · {n} oferta{plural} nueva{plural} para vos ({today})"
+            intro = (f"Encontré <b>{n}</b> oferta{plural} nueva{plural} "
+                     "en Argentina (Junior / Trainee / Pasantía) que encajan con tu CV.")
+            rows = "".join(_job_html(j) for j in ofertas)
+            body_txt = "\n".join(_job_text(j) for j in ofertas)
+        else:
+            subject = f"Radar de Empleo · Sin ofertas nuevas hoy ({today})"
+            intro = "Hoy no aparecieron ofertas nuevas que encajen con tu perfil. El radar sigue buscando."
+            rows = ""
+            body_txt = "Hoy no aparecieron ofertas nuevas que encajen con tu perfil."
 
-    jobs = pending_jobs(st["minimo"])
-    if not jobs and not (st["enviar_vacio"] or force):
-        db.set_meta("ultimo_resumen", date.today().isoformat())
-        log("Correo: sin ofertas nuevas que encajen; no se envía resumen.")
-        return {"sent": False, "count": 0, "reason": "sin novedades"}
-
-    today = datetime.now().strftime("%d/%m/%Y")
-    if jobs:
-        subject = f"Radar de Empleo · {len(jobs)} oferta{'s' if len(jobs) != 1 else ''} nueva{'s' if len(jobs) != 1 else ''} para vos ({today})"
-        intro = (f"Encontré <b>{len(jobs)}</b> oferta{'s' if len(jobs) != 1 else ''} nueva{'s' if len(jobs) != 1 else ''} "
-                 "en Argentina (Junior / Trainee / Pasantía) que encajan con tu CV.")
-        rows = "".join(_job_html(j) for j in jobs)
-        body_txt = "\n".join(_job_text(j) for j in jobs)
-    else:
-        subject = f"Radar de Empleo · Sin ofertas nuevas hoy ({today})"
-        intro = "Hoy no aparecieron ofertas nuevas que encajen con tu perfil. El radar sigue buscando."
-        rows = ""
-        body_txt = "Hoy no aparecieron ofertas nuevas que encajen con tu perfil."
-
-    html = f"""<div style="font-family:Segoe UI,Arial,sans-serif;max-width:640px;margin:auto;color:#111827">
+        html = f"""<div style="font-family:Segoe UI,Arial,sans-serif;max-width:640px;margin:auto;color:#111827">
       <h2 style="margin:0 0 6px">Radar de Empleo</h2>
       <p style="color:#374151;margin:0 0 10px">{intro}</p>
       <table style="width:100%;border-collapse:collapse">{rows}</table>
@@ -158,31 +143,15 @@ def send_digest(force: bool = False, log=print) -> dict:
         Puntaje mínimo para avisar: {st["minimo"]}. Podés cambiarlo en Configuración → Correo.
       </p></div>"""
 
-    _send(st["destinatario"], subject, html, f"{subject}\n\n{body_txt}")
-    ids = [j["id"] for j in jobs]
-    with db.connect() as conn:
-        conn.executemany("UPDATE jobs SET notified_at = ? WHERE id = ?", [(db.now(), i) for i in ids])
-    db.set_meta("ultimo_resumen", date.today().isoformat())
-    log(f"Correo: resumen enviado a {st['destinatario']} con {len(ids)} ofertas.")
-    return {"sent": True, "count": len(ids), "reason": "ok"}
+        _send(st["destinatario"], subject, html, f"{subject}\n\n{body_txt}")
+        return Resultado(self.nombre, True, [j["id"] for j in ofertas])
 
-
-def send_test() -> None:
-    cfg = load_config()
-    st = _settings(cfg)
-    _send(
-        st["destinatario"],
-        "Radar de Empleo · Correo de prueba",
-        "<p>¡Funciona! A partir de ahora vas a recibir el resumen diario de ofertas nuevas "
-        f"a las {st['hora']}:00 aprox.</p>",
-        f"¡Funciona! Vas a recibir el resumen diario de ofertas nuevas a las {st['hora']}:00 aprox.",
-    )
-
-
-def digest_due(cfg: dict | None = None) -> bool:
-    """True si ya pasó la hora del resumen y todavía no se envió hoy."""
-    cfg = cfg or load_config()
-    st = _settings(cfg)
-    if not (st["habilitado"] and configured()):
-        return False
-    return datetime.now().hour >= st["hora"] and db.get_meta("ultimo_resumen") != date.today().isoformat()
+    def enviar_prueba(self) -> None:
+        st = _settings(self.cfg)
+        _send(
+            st["destinatario"],
+            "Radar de Empleo · Correo de prueba",
+            "<p>¡Funciona! A partir de ahora vas a recibir el resumen diario de ofertas nuevas "
+            f"a las {st['hora']}:00 aprox.</p>",
+            f"¡Funciona! Vas a recibir el resumen diario de ofertas nuevas a las {st['hora']}:00 aprox.",
+        )

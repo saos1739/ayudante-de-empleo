@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from radar import ai, config, notify
+from radar import ai, config
+from radar.notifiers import email as canal_email
 
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -86,7 +87,7 @@ def test_el_resumen_por_mail_ignora_el_destinatario_del_config_json(monkeypatch)
     monkeypatch.setenv("RADAR_DESTINATARIO", "dest@example.com")
     cfg = {"notificaciones": {"destinatario": "viejo@example.com"}}
 
-    assert notify._settings(cfg)["destinatario"] == "dest@example.com"
+    assert canal_email._settings(cfg)["destinatario"] == "dest@example.com"
 
 
 def test_la_carta_sin_ia_firma_con_el_contacto_configurado(monkeypatch, sin_cv):

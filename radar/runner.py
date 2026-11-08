@@ -163,10 +163,10 @@ def scheduler_loop() -> None:
         try:
             cfg = load_config()
             # Resumen diario por correo (si el panel está abierto a la hora configurada)
-            from . import notify
-            if not STATE["running"] and notify.digest_due(cfg):
+            from . import notifiers
+            if not STATE["running"] and notifiers.digest_due(cfg):
                 try:
-                    notify.send_digest(log=log)
+                    notifiers.send_digest(log=log)
                 except Exception as e:
                     log(f"⚠ Correo: {e}")
             hours = float(cfg["busqueda"].get("intervalo_horas", 6))
