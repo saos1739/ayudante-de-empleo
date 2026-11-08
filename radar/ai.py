@@ -122,10 +122,23 @@ def analyze(job) -> dict:
 TAREA: evaluá qué tan buena es esta oferta para ESTE candidato (busca primer empleo como Junior/Trainee,
 vive en Zona Sur del GBA y puede ir a CABA). Sé honesto y concreto.
 
+Evaluá la oferta contra sus 3 puestos objetivo, en orden de prioridad:
+1. Desarrollador Full Stack / Frontend / Backend Jr o Trainee (JavaScript/TypeScript, React, React Native, Node.js, Python).
+2. Analista de Datos Jr / BI Jr (Python, Pandas, SQL).
+3. Cloud Jr (Google Cloud, AWS).
+Una oferta que no encaja con ninguno de los 3 ni pide tecnologías de su CV es "descartar".
+
+Experiencia pedida (regla "aplicá igual"):
+- Hasta 1 año de experiencia: normal.
+- 2 años: NO la descartes por eso. Es una oferta "aplicá igual": bajá el puntaje unos 10 puntos, no uses
+  "descartar" sólo por ese requisito y aclará en "consejo" que conviene postular destacando proyectos.
+- 3 años o más: "descartar".
+
 Devolvé SOLO este JSON:
 {{
   "puntaje": <entero 0-100: probabilidad realista de que el candidato sea considerado y le convenga>,
   "veredicto": "postular" | "evaluar" | "descartar",
+  "puesto_objetivo": "desarrollo" | "datos_bi" | "cloud" | "ninguno",
   "resumen": "<1-2 frases: qué es el puesto y qué haría>",
   "seniority_real": "trainee" | "junior" | "semi senior" | "senior" | "no claro",
   "modalidad": "<presencial/híbrido/remoto + lugar, si se infiere>",
@@ -180,7 +193,7 @@ Me interesa postularme a la posición de {job['title']}.
 
 Soy estudiante avanzado de la Tecnicatura Superior en Desarrollo de Software (IFTS N.° 29, CABA) y busco mi primer empleo en IT. En mi formación trabajé con {stack}, entre otras tecnologías.
 
-Entre mis proyectos se destacan una aplicación web Full Stack (Node.js, Express y SQL) con API REST, validaciones en backend y control de versiones en GitHub, y una plataforma en Python/Django con autenticación de usuarios y paneles de control. También cuento con certificación AWS Cloud Security & Fundamentals y estoy cursando el Cloud Engineer Track de Google Cloud.
+Entre mis proyectos se destacan una aplicación web Full Stack (Node.js, Express y SQL) con API REST, validaciones en backend y control de versiones en GitHub, y una plataforma en Python/Django con autenticación de usuarios y paneles de control. También cursé AWS Academy Cloud Foundations y estoy cursando la ruta Cloud Engineer de Google Cloud.
 
 Vivo en Zona Sur con fácil acceso a CABA, tengo disponibilidad inmediata e inglés intermedio (B2). Pueden ver mi código en github.com/saos1739 y mi perfil en linkedin.com/in/rojasantiagoa.
 
