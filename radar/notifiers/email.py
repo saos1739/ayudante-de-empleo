@@ -9,7 +9,7 @@ from email.message import EmailMessage
 from html import escape
 
 from ..config import destinatario
-from .base import Notificador, Resultado
+from .base import Contexto, Notificador, Resultado
 from .formato import etiqueta, motivos, puntaje
 
 SMTP_HOST = "smtp.gmail.com"
@@ -64,9 +64,14 @@ def _etiqueta_html(job) -> str:
             f'{colores};font-size:12px;font-weight:600">{escape(texto)}</span>')
 
 
-def _job_html(job) -> str:
+def _job_html(job, con_panel: bool = True) -> str:
     meta = " · ".join(escape(x) for x in (job["company"], job["location"], job["modality"], job["salary"]) if x)
     reasons = "".join(f"<li>{escape(r)}</li>" for r in motivos(job))
+    enlace_panel = (
+        f"""&nbsp;·&nbsp;
+      <a href="{PANEL_URL}/oferta/{job["id"]}" style="color:#2563eb;font-size:13px">Abrir en el panel (carta lista)</a>"""
+        if con_panel else ""
+    )
     return f"""
     <tr><td style="padding:14px 0;border-bottom:1px solid #e5e7eb">
       <div style="font-size:16px;font-weight:600;color:#111827">
@@ -78,8 +83,7 @@ def _job_html(job) -> str:
       <div style="color:#4b5563;font-size:13px;margin:4px 0">{meta} · <i>{escape(job["source"])}</i></div>
       <ul style="margin:6px 0 8px 18px;padding:0;color:#374151;font-size:13px">{reasons}</ul>
       <a href="{escape(job["url"] or "")}" style="color:#2563eb;font-size:13px">Ver aviso en {escape(job["source"])}</a>
-      &nbsp;·&nbsp;
-      <a href="{PANEL_URL}/oferta/{job["id"]}" style="color:#2563eb;font-size:13px">Abrir en el panel (carta lista)</a>
+      {enlace_panel}
     </td></tr>"""
 
 
@@ -96,7 +100,7 @@ class EmailNotificador(Notificador):
     def configurado(self) -> bool:
         return configured()
 
-    def enviar(self, ofertas: Sequence) -> Resultado:
+    def enviar(self, ofertas: Sequence, contexto: Contexto = Contexto()) -> Resultado:
         """Envía el resumen. Sin ofertas manda el aviso de «sin novedades» (el orquestador decide si corresponde)."""
         st = _settings(self.cfg)
         today = datetime.now().strftime("%d/%m/%Y")
@@ -106,7 +110,7 @@ class EmailNotificador(Notificador):
             subject = f"Radar de Empleo · {n} oferta{plural} nueva{plural} para vos ({today})"
             intro = (f"Encontré <b>{n}</b> oferta{plural} nueva{plural} "
                      "en Argentina (Junior / Trainee / Pasantía) que encajan con tu CV.")
-            rows = "".join(_job_html(j) for j in ofertas)
+            rows = "".join(_job_html(j, contexto.con_panel) for j in ofertas)
             body_txt = "\n".join(_job_text(j) for j in ofertas)
         else:
             subject = f"Radar de Empleo · Sin ofertas nuevas hoy ({today})"
@@ -114,14 +118,24 @@ class EmailNotificador(Notificador):
             rows = ""
             body_txt = "Hoy no aparecieron ofertas nuevas que encajen con tu perfil."
 
+        if contexto.fuentes_fallidas:
+            fallidas = ", ".join(contexto.fuentes_fallidas)
+            aviso_html = (f'<p style="color:#92400e;background:#fef3c7;padding:8px 10px;border-radius:6px;'
+                          f'font-size:13px">⚠ Fuentes que fallaron hoy: {escape(fallidas)}. Se reintentan en la próxima corrida.</p>')
+            body_txt += f"\n\n⚠ Fuentes que fallaron hoy: {fallidas}."
+        else:
+            aviso_html = ""
+        pie = ("Los links “Abrir en el panel” funcionan con el Radar abierto en tu PC (iniciar_radar.bat). "
+               f"Puntaje mínimo para avisar: {st['minimo']}. Podés cambiarlo en Configuración → Correo."
+               if contexto.con_panel else
+               f"Resumen generado en la nube (GitHub Actions). Puntaje mínimo para avisar: {st['minimo']}.")
+
         html = f"""<div style="font-family:Segoe UI,Arial,sans-serif;max-width:640px;margin:auto;color:#111827">
       <h2 style="margin:0 0 6px">Radar de Empleo</h2>
       <p style="color:#374151;margin:0 0 10px">{intro}</p>
+      {aviso_html}
       <table style="width:100%;border-collapse:collapse">{rows}</table>
-      <p style="color:#6b7280;font-size:12px;margin-top:18px">
-        Los links “Abrir en el panel” funcionan con el Radar abierto en tu PC (iniciar_radar.bat).
-        Puntaje mínimo para avisar: {st["minimo"]}. Podés cambiarlo en Configuración → Correo.
-      </p></div>"""
+      <p style="color:#6b7280;font-size:12px;margin-top:18px">{pie}</p></div>"""
 
         _send(st["destinatario"], subject, html, f"{subject}\n\n{body_txt}")
         return Resultado(self.nombre, True, [j["id"] for j in ofertas])

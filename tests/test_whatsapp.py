@@ -291,3 +291,22 @@ class TestIntegracionConElOrquestador:
         assert r["sent"] and 0 < r["count"] < 5
         assert any("parcial" in linea for linea in log)
         assert any("parcial" in e for e in r["errores"])
+
+
+class TestFuentesFallidasEnWhatsApp:
+    def test_el_cierre_menciona_las_fuentes_que_fallaron(self, base):
+        (texto, _), = armar_mensajes(ofertas_guardadas(2), HOY, hay_mail=True, fuentes_fallidas=["Bumeran", "Talent"])
+        assert texto.endswith("Fuentes con error hoy: Bumeran, Talent")
+
+    def test_sin_fallas_no_hay_linea_de_fuentes(self, base):
+        (texto, _), = armar_mensajes(ofertas_guardadas(2), HOY, hay_mail=True)
+        assert "Fuentes con error" not in texto
+
+    def test_va_despues_del_cierre_del_mail(self, base):
+        (texto, _), = armar_mensajes(ofertas_guardadas(7), HOY, hay_mail=True, fuentes_fallidas=["Bumeran"])
+        assert texto.endswith("+2 más en tu mail\n\nFuentes con error hoy: Bumeran")
+
+    def test_el_notificador_las_toma_del_contexto(self, cfg, credenciales, http, base):
+        from radar.notifiers.base import Contexto
+        WhatsAppNotificador(cfg).enviar(ofertas_guardadas(2), Contexto(fuentes_fallidas=("Bumeran",)))
+        assert "Fuentes con error hoy: Bumeran" in http.pedidos[0]["params"]["text"]

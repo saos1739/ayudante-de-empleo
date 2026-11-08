@@ -22,7 +22,7 @@ from datetime import date, datetime
 
 import requests
 
-from .base import Notificador, Resultado
+from .base import Contexto, Notificador, Resultado
 from .formato import etiqueta, puntaje
 
 CALLMEBOT_URL = "https://api.callmebot.com/whatsapp.php"
@@ -114,11 +114,11 @@ def _bloque(posicion: int, job, max_caracteres: int) -> str:
 
 
 def armar_mensajes(ofertas: Sequence, hoy: date, hay_mail: bool, max_caracteres: int = MAX_CARACTERES,
-                   max_ofertas: int = MAX_OFERTAS) -> list[tuple[str, list[int]]]:
+                   max_ofertas: int = MAX_OFERTAS, fuentes_fallidas: Sequence[str] = ()) -> list[tuple[str, list[int]]]:
     """Arma los mensajes del resumen como [(texto, ids de las ofertas que lleva)].
 
     Encabezado con fecha y cantidad, las `max_ofertas` de mejor puntaje (las recibe ya ordenadas) y el cierre
-    «+N más en tu mail». Si todo junto supera `max_caracteres` se parte en varios mensajes sin cortar ofertas.
+    «+N más en tu mail» (y, si hubo, las fuentes que fallaron). Si todo junto supera `max_caracteres` se parte en varios mensajes sin cortar ofertas.
     """
     total = len(ofertas)
     incluidas = ofertas[:max_ofertas]
@@ -132,6 +132,8 @@ def armar_mensajes(ofertas: Sequence, hoy: date, hay_mail: bool, max_caracteres:
     restantes = total - len(incluidas)
     if restantes and hay_mail:
         piezas.append((f"+{restantes} más en tu mail", None))
+    if fuentes_fallidas:
+        piezas.append((f"Fuentes con error hoy: {', '.join(fuentes_fallidas)}", None))
 
     mensajes: list[tuple[str, list[int]]] = []
     texto, ids = encabezado, []
@@ -167,12 +169,13 @@ class WhatsAppNotificador(Notificador):
             raise WhatsAppError(f"Proveedor de WhatsApp desconocido ({', '.join(PROVEEDORES)} disponibles).")
         return self.proveedor
 
-    def enviar(self, ofertas: Sequence) -> Resultado:
+    def enviar(self, ofertas: Sequence, contexto: Contexto = Contexto()) -> Resultado:
         """Manda las mejores ofertas. Si falla un mensaje intermedio, informa las que sí llegaron."""
         if not ofertas:
             return Resultado(self.nombre, False, [], "sin ofertas nuevas")
         proveedor = self._proveedor()
-        mensajes = armar_mensajes(ofertas, datetime.now().date(), self.hay_mail, self.max_caracteres)
+        mensajes = armar_mensajes(ofertas, datetime.now().date(), self.hay_mail, self.max_caracteres,
+                                  fuentes_fallidas=contexto.fuentes_fallidas)
         avisadas: list[int] = []
         for i, (texto, ids) in enumerate(mensajes):
             if i:

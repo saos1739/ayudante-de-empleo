@@ -7,6 +7,14 @@ from dataclasses import dataclass, field
 from ..config import load_config
 
 
+@dataclass(frozen=True)
+class Contexto:
+    """Cómo se está corriendo: en tu PC (con panel) o en GitHub Actions (sin panel)."""
+
+    con_panel: bool = True  # en CI los links al panel local no sirven y no se incluyen
+    fuentes_fallidas: tuple[str, ...] = ()  # portales que fallaron en esta corrida; el resumen los menciona
+
+
 @dataclass
 class Resultado:
     """Qué pasó al enviar por un canal. `ids_avisados` son las ofertas que de verdad llegaron."""
@@ -30,7 +38,7 @@ class Notificador(ABC):
         """True si están las credenciales necesarias para enviar."""
 
     @abstractmethod
-    def enviar(self, ofertas: Sequence) -> Resultado:
+    def enviar(self, ofertas: Sequence, contexto: Contexto = Contexto()) -> Resultado:
         """Envía el resumen con estas ofertas (ya ordenadas por puntaje). Si falla, levanta una excepción."""
 
     @abstractmethod

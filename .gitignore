@@ -28,6 +28,9 @@ __pycache__/
 env/
 venv/
 
+# Estado de la corrida en la nube (vive en la rama radar-state, no en main)
+.estado/
+
 # Logs y temporales
 *.log
 scratch/

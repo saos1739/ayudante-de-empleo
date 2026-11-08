@@ -234,6 +234,14 @@
       "empleosit",
       "talent"
     ],
+    "fuentes_ci": [
+      "getonbrd",
+      "bumeran",
+      "zonajobs",
+      "computrabajo",
+      "empleosit",
+      "talent"
+    ],
     "paginas_por_palabra": 1,
     "getonbrd_categorias": [
       "programming"
@@ -557,6 +565,7 @@
     "puntaje_minimo_para_ia": 50
   },
   "notificaciones": {
+    "modo": "local",
     "canales": [
       "email",
       "whatsapp"

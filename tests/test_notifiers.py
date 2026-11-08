@@ -9,7 +9,7 @@ import pytest
 from radar import db, notifiers
 from radar.config import CONFIG_PATH
 from radar.notifiers import email as canal_email
-from radar.notifiers.base import Notificador, Resultado
+from radar.notifiers.base import Contexto, Notificador, Resultado
 from tests.helpers import guardar
 
 DESC = "Perfil junior con JavaScript y React. "
@@ -32,7 +32,7 @@ def canal_falso(nombre, *, configurado=True, falla=None, maximo=None):
         def configurado(self):
             return configurado
 
-        def enviar(self, ofertas):
+        def enviar(self, ofertas, contexto=None):
             if falla:
                 raise RuntimeError(falla)
             return Resultado(nombre, True, [o["id"] for o in ofertas][:maximo])
@@ -193,3 +193,30 @@ class TestCorreo:
     def test_sin_credenciales_no_esta_configurado(self, cfg, monkeypatch):
         monkeypatch.setenv("GMAIL_APP_PASSWORD", "")
         assert not canal_email.EmailNotificador(cfg).configurado()
+
+    def test_en_ci_el_correo_no_incluye_links_al_panel_local(self, cfg, tres_ofertas):
+        filas = notifiers.pending_jobs(0)
+        canal_email.EmailNotificador(cfg).enviar(filas, Contexto(con_panel=False))
+        html = FakeSMTP.enviados[0].get_body(("html",)).get_content()
+        assert "127.0.0.1" not in html and "Abrir en el panel" not in html
+        assert "GitHub Actions" in html
+
+    def test_en_local_el_correo_sigue_incluyendo_el_link_al_panel(self, cfg, tres_ofertas):
+        canal_email.EmailNotificador(cfg).enviar(notifiers.pending_jobs(0))
+        html = FakeSMTP.enviados[0].get_body(("html",)).get_content()
+        assert "Abrir en el panel" in html
+
+    def test_el_correo_menciona_las_fuentes_que_fallaron(self, cfg, tres_ofertas):
+        contexto = Contexto(con_panel=False, fuentes_fallidas=("Bumeran", "Talent (sin resultados)"))
+        canal_email.EmailNotificador(cfg).enviar(notifiers.pending_jobs(0), contexto)
+        mensaje = FakeSMTP.enviados[0]
+        assert "Bumeran, Talent (sin resultados)" in mensaje.get_body(("html",)).get_content()
+        assert "Bumeran, Talent (sin resultados)" in mensaje.get_body(("plain",)).get_content()
+
+    def test_sin_fallas_el_correo_no_agrega_avisos_de_fuentes(self, cfg, tres_ofertas):
+        canal_email.EmailNotificador(cfg).enviar(notifiers.pending_jobs(0))
+        assert "Fuentes que fallaron" not in FakeSMTP.enviados[0].get_body(("plain",)).get_content()
+
+    def test_el_aviso_de_sin_novedades_tambien_menciona_las_fuentes_caidas(self, cfg, base):
+        canal_email.EmailNotificador(cfg).enviar([], Contexto(fuentes_fallidas=("Bumeran",)))
+        assert "Bumeran" in FakeSMTP.enviados[0].get_body(("plain",)).get_content()

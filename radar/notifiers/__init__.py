@@ -9,7 +9,7 @@ from datetime import date, datetime
 
 from .. import db
 from ..config import load_config
-from .base import Notificador, Resultado
+from .base import Contexto, Notificador, Resultado
 from .email import EmailNotificador
 from .whatsapp import WhatsAppNotificador
 
@@ -33,6 +33,21 @@ def _ajustes(cfg: dict) -> dict:
     }
 
 
+def modo(cfg: dict) -> str:
+    """«local» (tu PC) o «ci» (GitHub Actions): el entorno que manda los avisos. Lo desconocido cuenta como local."""
+    valor = cfg.get("notificaciones", {}).get("modo", "local")
+    return valor if valor in ("local", "ci") else "local"
+
+
+def modo_permite(cfg: dict, en_ci: bool) -> bool:
+    """True si este entorno es el que debe mandar avisos. Evita recibirlos repetidos si se usan los dos."""
+    return modo(cfg) == ("ci" if en_ci else "local")
+
+
+def _salida(sent: bool, count: int, reason: str, errores: list | None = None, ids: list | None = None) -> dict:
+    return {"sent": sent, "count": count, "reason": reason, "errores": errores or [], "ids": ids or []}
+
+
 def crear_notificadores(cfg: dict) -> list[Notificador]:
     """Un notificador por cada canal listado en `notificaciones.canales`."""
     return [CANALES[nombre](cfg) for nombre in _ajustes(cfg)["canales"]]
@@ -49,17 +64,23 @@ def pending_jobs(minimo: int):
         ).fetchall()
 
 
-def send_digest(force: bool = False, log=print) -> dict:
+def send_digest(force: bool = False, log=print, en_ci: bool = False, fuentes_fallidas=()) -> dict:
     """Envía el resumen con las ofertas aún no avisadas por todos los canales configurados.
 
-    Devuelve {'sent': bool, 'count': n, 'reason': str, 'errores': [str]}. `sent` es True si llegó por al
-    menos un canal; `count` es la cantidad de ofertas que quedaron marcadas como avisadas.
+    `en_ci` indica que corre en GitHub Actions: sin links al panel y sólo si `notificaciones.modo` es «ci»
+    (con `force` se manda igual). `fuentes_fallidas` se menciona en el resumen.
+
+    Devuelve {'sent': bool, 'count': n, 'reason': str, 'errores': [str], 'ids': [int]}. `sent` es True si llegó
+    por al menos un canal; `count` e `ids` son las ofertas que quedaron marcadas como avisadas.
     """
     db.init_db()
     cfg = load_config()
     st = _ajustes(cfg)
     if not st["habilitado"] and not force:
-        return {"sent": False, "count": 0, "reason": "avisos deshabilitados", "errores": []}
+        return _salida(False, 0, "avisos deshabilitados")
+    if not force and not modo_permite(cfg, en_ci):
+        return _salida(False, 0, f"modo «{modo(cfg)}»: los avisos los manda "
+                                 f"{'tu PC' if modo(cfg) == 'local' else 'GitHub Actions'}")
 
     notificadores = []
     for notificador in crear_notificadores(cfg):
@@ -68,19 +89,20 @@ def send_digest(force: bool = False, log=print) -> dict:
         else:
             log(f"{notificador.nombre}: sin configurar, se omite.")
     if not notificadores:
-        return {"sent": False, "count": 0, "reason": "ningún canal configurado", "errores": []}
+        return _salida(False, 0, "ningún canal configurado")
 
     jobs = pending_jobs(st["minimo"])
     if not jobs and not (st["enviar_vacio"] or force):
         db.set_meta("ultimo_resumen", date.today().isoformat())
         log("Avisos: sin ofertas nuevas que encajen; no se envía resumen.")
-        return {"sent": False, "count": 0, "reason": "sin novedades", "errores": []}
+        return _salida(False, 0, "sin novedades")
 
+    contexto = Contexto(con_panel=not en_ci, fuentes_fallidas=tuple(fuentes_fallidas))
     resultados: list[Resultado] = []
     errores: list[str] = []
     for notificador in notificadores:
         try:
-            resultado = notificador.enviar(jobs)
+            resultado = notificador.enviar(jobs, contexto)
         except Exception as e:  # un canal caído no corta a los demás
             log(f"⚠ {notificador.nombre}: {e}")
             errores.append(f"{notificador.nombre}: {e}")
@@ -95,13 +117,13 @@ def send_digest(force: bool = False, log=print) -> dict:
     llegaron = [r for r in resultados if r.enviado]
     if not llegaron:
         motivos = [f"{r.canal}: {r.motivo}" for r in resultados] + errores
-        return {"sent": False, "count": 0, "reason": "; ".join(motivos) or "sin novedades", "errores": errores}
+        return _salida(False, 0, "; ".join(motivos) or "sin novedades", errores)
 
     ids = sorted({i for r in llegaron for i in r.ids_avisados})
     with db.connect() as conn:
         conn.executemany("UPDATE jobs SET notified_at = ? WHERE id = ?", [(db.now(), i) for i in ids])
     db.set_meta("ultimo_resumen", date.today().isoformat())
-    return {"sent": True, "count": len(ids), "reason": "ok", "errores": errores}
+    return _salida(True, len(ids), "ok", errores, ids)
 
 
 def send_test(canal: str) -> None:
@@ -113,6 +135,7 @@ def digest_due(cfg: dict | None = None) -> bool:
     """True si ya pasó la hora del resumen y todavía no se envió hoy."""
     cfg = cfg or load_config()
     st = _ajustes(cfg)
-    if not (st["habilitado"] and any(n.configurado() for n in crear_notificadores(cfg))):
+    if not (st["habilitado"] and modo_permite(cfg, en_ci=False)
+            and any(n.configurado() for n in crear_notificadores(cfg))):
         return False
     return datetime.now().hour >= st["hora"] and db.get_meta("ultimo_resumen") != date.today().isoformat()
