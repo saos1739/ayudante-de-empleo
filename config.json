@@ -351,7 +351,6 @@
   },
   "notificaciones": {
     "email_habilitado": true,
-    "destinatario": "santiirojas2000@gmail.com",
     "hora_resumen": 8,
     "puntaje_minimo_email": 60,
     "enviar_si_no_hay_novedades": true

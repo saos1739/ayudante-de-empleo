@@ -81,7 +81,7 @@
         </div>
         <div class="row">
           <label class="lbl">Enviar a
-            <input type="email" name="destinatario" value="{{ n.destinatario or gmail_user }}"></label>
+            <input type="email" name="destinatario" value="{{ destinatario }}"></label>
           <label class="lbl">Hora del resumen (0–23)
             <input type="number" name="hora" value="{{ n.hora_resumen or 8 }}" min="0" max="23"></label>
           <label class="lbl">Avisar si el puntaje es ≥

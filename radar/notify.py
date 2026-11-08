@@ -9,7 +9,7 @@ from email.message import EmailMessage
 from html import escape
 
 from . import db
-from .config import load_config
+from .config import destinatario, load_config
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
@@ -33,7 +33,7 @@ def _settings(cfg: dict) -> dict:
     n = cfg.get("notificaciones", {})
     return {
         "habilitado": n.get("email_habilitado", True),
-        "destinatario": n.get("destinatario") or gmail_user(),
+        "destinatario": destinatario(),
         "hora": int(n.get("hora_resumen", 8)),
         "minimo": int(n.get("puntaje_minimo_email", 60)),
         "enviar_vacio": bool(n.get("enviar_si_no_hay_novedades", False)),

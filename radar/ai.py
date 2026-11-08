@@ -8,7 +8,7 @@ import re
 
 import requests
 
-from .config import gemini_key, load_config, load_cv
+from .config import contacto_candidato, gemini_key, load_config, load_cv
 
 API = "https://generativelanguage.googleapis.com/v1beta"
 _resolved_model = None
@@ -171,6 +171,9 @@ def template_letter(job, matched_stack: list) -> dict:
     empresa = job["company"] if job["company"] and job["company"] != "Confidencial" else None
     saludo = f"Estimado equipo de selección de {empresa}:" if empresa else "Estimado equipo de selección:"
     stack = ", ".join(matched_stack[:5]) if matched_stack else "JavaScript (Node.js, React), Python y SQL"
+    contacto = contacto_candidato()
+    datos_contacto = " | ".join(d for d in (contacto["email"], contacto["telefono"]) if d)
+    firma = f"{nombre}\n{datos_contacto}" if datos_contacto else nombre
     carta = f"""{saludo}
 
 Me interesa postularme a la posición de {job['title']}.
@@ -183,8 +186,7 @@ Vivo en Zona Sur con fácil acceso a CABA, tengo disponibilidad inmediata e ingl
 
 Muchas gracias por su tiempo.
 
-{nombre}
-santiirojas2000@gmail.com | +54 9 11 3120-1154"""
+{firma}"""
     mensaje = (f"Hola, ¿cómo estás? Me postulé a {job['title']}"
                f"{' en ' + empresa if empresa else ''}. Soy estudiante de la Tecnicatura en Desarrollo de "
                f"Software (IFTS 29) con proyectos en {stack}. Mi GitHub: github.com/saos1739. ¡Gracias!")

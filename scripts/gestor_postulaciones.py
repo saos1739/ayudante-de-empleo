@@ -2,18 +2,28 @@
 # -*- coding: utf-8 -*-
 """
 Gestor Automatizado de Postulaciones y Propuestas
-Candidato: Santiago Agustín Rojas Casas
+
+El nombre sale de config.json y el contacto (teléfono y mail) de las variables
+CANDIDATO_TELEFONO / CANDIDATO_EMAIL o del perfil/cv.md local.
 """
 
+import argparse
 import os
 import re
-import argparse
+import sys
 from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from radar.config import contacto_candidato, load_config  # noqa: E402
+
+_CONTACTO = contacto_candidato()
 
 PERFIL_CANDIDATO = {
-    "nombre": "Santiago Agustín Rojas Casas",
-    "email": "santiirojas2000@gmail.com",
-    "telefono": "+54 9 11 3120-1154",
+    "nombre": load_config()["candidato"]["nombre"],
+    "email": _CONTACTO["email"],
+    "telefono": _CONTACTO["telefono"],
     "linkedin": "https://www.linkedin.com/in/rojasantiagoa",
     "github": "https://github.com/saos1739",
     "estudios": "Tecnicatura Superior en Desarrollo de Software (IFTS N.° 29, CABA)",
@@ -104,7 +114,7 @@ Hola, un gusto saludarte. Vi la vacante de {puesto} en {empresa} y me interesó 
     
     print(f"\n[OK] Propuesta generada con éxito: {nombre_archivo}")
     print(f"[OK] Score de compatibilidad estimado: {score}%")
-    print(f"[OK] Registrado en tracking_postulaciones.md\n")
+    print("[OK] Registrado en tracking_postulaciones.md\n")
 
 def registrar_en_tracking(fecha, empresa, puesto, plataforma, modalidad, score, archivo_propuesta):
     tracker_file = "tracking_postulaciones.md"

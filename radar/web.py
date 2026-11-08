@@ -8,7 +8,7 @@ from datetime import date, datetime
 from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
 
 from . import ai, db, runner, scoring
-from .config import CV_PATH, gemini_key, load_config, load_cv, save_config, save_env_value
+from .config import CV_PATH, destinatario, gemini_key, load_config, load_cv, save_config, save_env_value
 
 app = Flask(__name__)
 app.secret_key = "radar-empleo-local"
@@ -212,7 +212,8 @@ def config_view():
                     save_env_value("GMAIL_APP_PASSWORD", pwd)
                 n = cfg.setdefault("notificaciones", {})
                 n["email_habilitado"] = bool(request.form.get("habilitado"))
-                n["destinatario"] = request.form.get("destinatario", "").strip() or user
+                n.pop("destinatario", None)  # el destinatario vive en .env, no en el config versionado
+                save_env_value("RADAR_DESTINATARIO", request.form.get("destinatario", "").strip())
                 n["hora_resumen"] = int(request.form.get("hora", 8) or 8)
                 n["puntaje_minimo_email"] = int(request.form.get("minimo_email", 60) or 0)
                 n["enviar_si_no_hay_novedades"] = bool(request.form.get("vacio"))
@@ -229,11 +230,12 @@ def config_view():
                 flash(f"Error al enviar el correo: {e}", "error")
             return redirect(url_for("config_view") + "#correo")
         return redirect(url_for("config_view"))
-    from .sources import ALL_SOURCES
     from . import notify
+    from .sources import ALL_SOURCES
     return render_template("config.html", cfg=cfg, all_sources=ALL_SOURCES, cv=load_cv(),
                            has_key=bool(gemini_key()), mail_ok=notify.configured(),
-                           gmail_user=notify.gmail_user(), last_digest=db.get_meta("ultimo_resumen"))
+                           gmail_user=notify.gmail_user(), destinatario=destinatario(),
+                           last_digest=db.get_meta("ultimo_resumen"))
 
 
 # ---------------- arranque ----------------
