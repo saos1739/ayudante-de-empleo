@@ -3,7 +3,7 @@
 ## Progreso
 
 - [x] Fase 0: repo presentable y sin datos personales
-- [ ] Fase 1: filtros alineados con mi perfil
+- [x] Fase 1: filtros alineados con mi perfil
 - [ ] Fase 2: avisos por WhatsApp
 - [ ] Fase 3: ejecución diaria en GitHub Actions
 - [ ] Fase 4: tests, CI y README
