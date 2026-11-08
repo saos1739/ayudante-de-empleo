@@ -5,6 +5,9 @@ from functools import lru_cache
 
 from .util import norm
 
+# Valores por defecto del perfil. Se pueden pisar desde config.json (`perfil.stack_core` y
+# `perfil.stack_ajeno`) para actualizar el perfil sin tocar código.
+#
 # Tecnologías principales del CV de Santiago (las que definen si una oferta técnica le sirve).
 STACK_CORE = {
     "JavaScript": ["javascript", "js", "es6"],
@@ -30,7 +33,8 @@ STACK_COMPLEMENTARIO = {
     "Postman": ["postman"],
 }
 
-STACK_PROPIO = {**STACK_CORE, **STACK_COMPLEMENTARIO}
+# Entradas del stack core que por sí solas no alcanzan para decir que la oferta es de desarrollo/datos/cloud.
+STACK_CORE_NO_PRIMARIO = ("APIs REST", "C# (básico)")
 
 REMOTO = ["remoto", "remote", "home office", "teletrabajo", "100% remoto", "fully remote"]
 
@@ -119,6 +123,16 @@ PROVINCIAS_LEJANAS = [
 ]
 
 
+def stack_core(cfg: dict) -> dict:
+    """Stack propio {nombre: [alias]} según config.json; si falta, el default."""
+    return cfg.get("perfil", {}).get("stack_core") or STACK_CORE
+
+
+def stack_ajeno(cfg: dict) -> list:
+    """Términos del título que descartan la oferta, según config.json; si faltan, el default."""
+    return cfg.get("perfil", {}).get("stack_ajeno") or TITULO_STACK_AJENO
+
+
 @lru_cache(maxsize=2048)
 def _rx(term: str) -> re.Pattern:
     t = norm(term.strip())
@@ -181,15 +195,12 @@ def evaluate(job: dict, cfg: dict) -> dict:
         reasons.append({"p": points, "t": text})
 
     full = f"{title} {desc}"
-    matched_core = [name for name, aliases in STACK_CORE.items() if find_term(full, aliases)]
+    matched_core = [name for name, aliases in stack_core(cfg).items() if find_term(full, aliases)]
     matched_comp = [name for name, aliases in STACK_COMPLEMENTARIO.items() if find_term(full, aliases)]
     matched = matched_core + matched_comp
 
-    # Tecnologías de desarrollo web/datos principales de Santiago para validar si la oferta es de su palo
-    has_primary_dev_stack = any(
-        k in matched_core
-        for k in ("JavaScript", "Node.js", "Express", "React", "Python", "Django", "SQL", "HTML/CSS", "Datos/BI", "Salesforce", "AWS", "Google Cloud")
-    )
+    # Tecnologías de desarrollo web/datos/cloud de Santiago para validar si la oferta es de su palo
+    has_primary_dev_stack = any(k not in STACK_CORE_NO_PRIMARIO for k in matched_core)
 
     # ---------- exclusiones duras ----------
     # 1. Seniority alto o Semi-Senior en el título
@@ -205,7 +216,7 @@ def evaluate(job: dict, cfg: dict) -> dict:
 
     # 3. Tecnología o rubro en el título que no coincide con el perfil de Santiago (.NET, Java, Angular, SAP, PLC, Soporte, etc.)
     if not exclude:
-        hit_foreign_title = find_term(title, TITULO_STACK_AJENO)
+        hit_foreign_title = find_term(title, stack_ajeno(cfg))
         if hit_foreign_title and not has_primary_dev_stack:
             exclude = f"Pide tecnología/rubro ajeno a tu CV en el título («{hit_foreign_title}»)"
         elif hit_foreign_title and hit_foreign_title in (
