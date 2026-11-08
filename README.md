@@ -106,3 +106,37 @@ LABUBU/
 - Consola: `python -m radar probar-mail` · `python -m radar resumen --forzar`
 - Log: `%LOCALAPPDATA%\RadarEmpleo\resumen.log`
 - Para desactivarlo: destildá "Resumen diario activado" o borrá la tarea en el Programador de tareas de Windows.
+
+
+## Avisos por WhatsApp
+
+Además del mail, el resumen puede llegar a tu WhatsApp con [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/) (gratis, uso personal: solo te manda mensajes a vos).
+
+1. Activá CallMeBot desde tu WhatsApp siguiendo su guía; te devuelve una **apikey**.
+2. Cargá `WHATSAPP_PHONE` (con código de país) y `CALLMEBOT_APIKEY` en tu `.env`, o desde el panel → **Configuración → WhatsApp**.
+3. Probalo: `python -m radar probar-whatsapp` (o el botón del panel).
+
+El mensaje trae la fecha, las 5 ofertas de mejor puntaje (con etiqueta, empresa, modalidad y link) y "+N más en tu mail". Si es largo se parte en varios mensajes con una pausa entre envíos. Los canales se eligen en `notificaciones.canales` (`["email", "whatsapp"]`); si uno falla se registra y se sigue con el otro.
+
+> CallMeBot no publica el largo máximo ni los límites de envío, por eso `whatsapp_max_caracteres` (900) y `whatsapp_pausa_seg` (5) son configurables en `config.json`.
+
+
+## Ejecución diaria en la nube (GitHub Actions)
+
+Para recibir los avisos **aunque tu PC esté apagada**, el workflow `.github/workflows/radar-diario.yml` corre todos los días a las **8:17 (hora Argentina)** y también a mano desde la pestaña *Actions → Radar diario → Run workflow*.
+
+**Cómo activarlo**
+
+1. En el repo: *Settings → Secrets and variables → Actions* y cargá `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `RADAR_DESTINATARIO`, `WHATSAPP_PHONE`, `CALLMEBOT_APIKEY` y, si querés IA, `GEMINI_API_KEY` (los de WhatsApp y Gemini son opcionales).
+2. En `config.json`, poné `"modo": "ci"` en `notificaciones` y subí el cambio. Por defecto es `"local"`.
+3. Corré el workflow a mano. Una segunda corrida no repite ofertas.
+
+**`notificaciones.modo`** evita recibir avisos repetidos si usás las dos opciones: solo el entorno que coincide con el modo manda avisos. Con `"ci"`, la tarea programada de Windows y el panel no mandan el resumen (podés forzarlo a mano con `python -m radar resumen --forzar`); con `"local"`, GitHub Actions no manda nada.
+
+**Cómo funciona**
+
+- `python -m radar resumen --ci` corre sin panel ni navegador y los avisos no incluyen links al panel local.
+- Cada corrida de GitHub arranca vacía, así que las ofertas ya avisadas se recuerdan en `notificados.json`, en la rama huérfana `radar-state`. Guarda **solo hashes** (nada de títulos, empresas ni el estado de tus postulaciones) y borra los de más de 45 días sin aparecer.
+- Busca en `busqueda.fuentes_ci`, separada de `fuentes_activas`. **LinkedIn está desactivado ahí** porque suele bloquear las IPs de servidores. Una fuente que falla se registra y se saltea, nunca corta la corrida, y el resumen dice cuáles fallaron. Si algún canal de aviso falla, el workflow termina en rojo y GitHub te avisa por mail.
+
+**⚠ Workflows programados en repos públicos:** GitHub los **desactiva automáticamente después de 60 días sin actividad** en el repositorio. Para reactivarlo: pestaña *Actions → Radar diario* y botón **Enable workflow** (o hacé un commit y volvé a correrlo a mano con *Run workflow*). Además, GitHub puede demorar unos minutos los jobs programados.
