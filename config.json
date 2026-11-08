@@ -170,7 +170,40 @@
       "tango",
       "calipso",
       "finnegans"
-    ]
+    ],
+    "puestos_objetivo": {
+      "Desarrollo Full Stack / Frontend / Backend": [
+        "desarrollador",
+        "developer",
+        "programador",
+        "desarrollo de software",
+        "full stack",
+        "fullstack",
+        "full-stack",
+        "frontend",
+        "front end",
+        "front-end",
+        "backend",
+        "back end",
+        "back-end",
+        "ingeniero de software",
+        "software engineer"
+      ],
+      "Datos / BI": [
+        "analista de datos",
+        "data analyst",
+        "analista bi",
+        "analista de bi",
+        "bi analyst",
+        "business intelligence",
+        "analytics",
+        "analista de inteligencia"
+      ],
+      "Cloud": [
+        "cloud",
+        "devops"
+      ]
+    }
   },
   "busqueda": {
     "palabras_clave": [

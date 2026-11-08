@@ -101,3 +101,131 @@ class TestRegla6Jornada:
     def test_full_time_no_resta(self, cfg):
         r = scoring.evaluate(aviso(descripcion=DESC_JS + "Jornada full time. "), cfg)
         assert not any("jornada" in m["t"].lower() for m in r["reasons"])
+
+
+class TestRegla3Experiencia:
+    def test_hasta_un_anio_es_normal(self, cfg):
+        r = scoring.evaluate(aviso(descripcion=DESC_JS + "Hasta 1 año de experiencia. "), cfg)
+        assert not r["excluded"]
+        assert r["etiqueta"] == "encaja"
+        assert not any((m["p"] or 0) < 0 for m in r["reasons"])
+
+    def test_dos_anios_no_excluye_y_marca_aplica_igual_con_penalizacion(self, cfg):
+        base = scoring.evaluate(aviso(descripcion=DESC_JS), cfg)
+        r = scoring.evaluate(aviso(descripcion=DESC_JS + "Requisitos: 2 años de experiencia en JavaScript. "), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+        assert r["etiqueta"] == "aplicá igual"
+        assert r["score"] < base["score"]
+        assert any((m["p"] or 0) < 0 and "2 años" in m["t"] for m in r["reasons"])
+
+    @pytest.mark.parametrize("anios", [3, 5])
+    def test_tres_anios_o_mas_excluye(self, cfg, anios):
+        r = scoring.evaluate(
+            aviso(descripcion=DESC_JS + f"Requisitos: {anios} años de experiencia en JavaScript. "), cfg)
+        assert r["excluded"]
+        assert f"{anios}+ años" in r["exclude_reason"]
+        assert r["etiqueta"] is None
+
+    def test_sin_anios_pedidos_encaja(self, cfg):
+        assert scoring.evaluate(aviso(descripcion=DESC_JS), cfg)["etiqueta"] == "encaja"
+
+
+class TestRegla4RemotoDesdeElExterior:
+    def test_remoto_que_acepta_latam_se_mantiene_con_penalizacion_leve(self, cfg):
+        r = scoring.evaluate(
+            aviso(descripcion=DESC_JS + "Trabajo 100% remoto, abierto a candidatos de LATAM. ",
+                  ubicacion="Remoto - Estados Unidos", modalidad="Remoto"), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+        assert any(m["p"] == -5 and "exterior" in m["t"].lower() for m in r["reasons"])
+
+    def test_remoto_anywhere_se_mantiene(self, cfg):
+        r = scoring.evaluate(
+            aviso(descripcion=DESC_JS + "Fully remote, work from anywhere. ", ubicacion="Chile", modalidad="Remote"), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+
+    def test_remoto_que_acepta_argentina_en_getonboard_se_mantiene(self, cfg):
+        r = scoring.evaluate(
+            aviso(descripcion=DESC_JS + "Remoto, podés vivir en Argentina. ", ubicacion="Remoto",
+                  modalidad="Remoto", countries=["Chile"]), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+
+    def test_remoto_que_no_aclara_si_acepta_argentina_se_excluye(self, cfg):
+        r = scoring.evaluate(
+            aviso(descripcion=DESC_JS + "Trabajo remoto. ", ubicacion="Colombia", modalidad="Remoto"), cfg)
+        assert r["excluded"]
+
+    def test_presencial_en_el_exterior_se_excluye_aunque_mencione_latam(self, cfg):
+        r = scoring.evaluate(
+            aviso(descripcion=DESC_JS + "Oficina en Madrid, abierto a LATAM. ", ubicacion="Madrid", modalidad="Presencial"),
+            cfg)
+        assert r["excluded"]
+        assert "fuera de Argentina" in r["exclude_reason"]
+
+    def test_hibrido_en_el_exterior_se_excluye(self, cfg):
+        r = scoring.evaluate(
+            aviso(descripcion=DESC_JS + "Esquema híbrido, LATAM bienvenido. ", ubicacion="Bogotá", modalidad="Híbrido"),
+            cfg)
+        assert r["excluded"]
+
+    def test_remoto_que_exige_residir_en_otro_pais_se_excluye(self, cfg):
+        r = scoring.evaluate(
+            aviso(descripcion=DESC_JS + "100% remote, anywhere, but you must reside in the US. ",
+                  ubicacion="Remoto - Estados Unidos", modalidad="Remote"), cfg)
+        assert r["excluded"]
+        assert "residir" in r["exclude_reason"]
+
+    def test_oferta_argentina_no_se_ve_afectada(self, cfg):
+        r = scoring.evaluate(aviso(descripcion=DESC_JS, ubicacion="Lomas de Zamora"), cfg)
+        assert not r["excluded"]
+        assert not any("exterior" in m["t"].lower() for m in r["reasons"])
+
+
+class TestRegla5Ingles:
+    @pytest.mark.parametrize("frase", [
+        "Inglés intermedio.", "Inglés intermedio-avanzado.", "Upper intermediate English.",
+        "Upper intermediate to advanced English.",
+    ])
+    def test_b2_alcanza(self, cfg, frase):
+        r = scoring.evaluate(aviso(descripcion=DESC_JS + frase + " "), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+
+    @pytest.mark.parametrize("frase", [
+        "Inglés avanzado.", "Inglés fluido.", "Inglés bilingüe.", "Advanced English.", "Fluent English.",
+        "Inglés C1.", "Inglés C2.", "English C1 required.",
+    ])
+    def test_siguen_excluyendo_avanzado_fluido_bilingue_c1_y_c2(self, cfg, frase):
+        r = scoring.evaluate(aviso(descripcion=DESC_JS + frase + " "), cfg)
+        assert r["excluded"]
+        assert "inglés" in r["exclude_reason"].lower()
+
+
+class TestRegla7Portfolio:
+    @pytest.mark.parametrize("titulo", [
+        "Desarrollador Backend Jr", "Analista de Datos Jr", "Analista BI Jr", "Cloud Engineer Jr", "DevOps Junior",
+    ])
+    def test_puesto_objetivo_sin_tecnologias_en_el_aviso_se_mantiene(self, cfg, titulo):
+        r = scoring.evaluate(aviso(titulo=titulo, descripcion="Sumate a un equipo joven, perfil junior. "), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+
+    def test_tecnologia_core_alcanza_aunque_el_titulo_no_sea_un_puesto_objetivo(self, cfg):
+        r = scoring.evaluate(
+            aviso(titulo="Analista Funcional Jr", descripcion="Perfil junior. Consultas SQL y documentación. "), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+
+    def test_ni_tecnologia_ni_puesto_objetivo_se_descarta(self, cfg):
+        r = scoring.evaluate(
+            aviso(titulo="Analista Funcional Jr", descripcion="Perfil junior. Relevamiento de software interno. "), cfg)
+        assert r["excluded"]
+        assert "puestos objetivo" in r["exclude_reason"]
+
+    def test_trainee_it_sin_tecnologia_ni_puesto_se_descarta(self, cfg):
+        r = scoring.evaluate(
+            aviso(titulo="Trainee IT", descripcion="Programa trainee en el área de tecnología. "), cfg)
+        assert r["excluded"]
+
+    def test_los_puestos_objetivo_se_leen_de_config(self, cfg):
+        cfg["perfil"]["puestos_objetivo"] = {"Otro": ["tester"]}
+        r = scoring.evaluate(aviso(titulo="Tester Jr", descripcion="Perfil junior, testing manual. "), cfg)
+        assert not r["excluded"], r["exclude_reason"]
+        r = scoring.evaluate(aviso(titulo="Analista de Datos Jr", descripcion="Perfil junior. "), cfg)
+        assert r["excluded"]

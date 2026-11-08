@@ -38,6 +38,20 @@ STACK_COMPLEMENTARIO = {
     "Postman": ["postman"],
 }
 
+# Los 3 puestos objetivo (en orden de prioridad): términos que, en el título, indican que la oferta encaja.
+PUESTOS_OBJETIVO = {
+    "Desarrollo Full Stack / Frontend / Backend": [
+        "desarrollador", "developer", "programador", "desarrollo de software", "full stack", "fullstack",
+        "full-stack", "frontend", "front end", "front-end", "backend", "back end", "back-end",
+        "ingeniero de software", "software engineer",
+    ],
+    "Datos / BI": [
+        "analista de datos", "data analyst", "analista bi", "analista de bi", "bi analyst",
+        "business intelligence", "analytics", "analista de inteligencia",
+    ],
+    "Cloud": ["cloud", "devops"],
+}
+
 # Entradas del stack core que por sí solas no alcanzan para decir que la oferta es de desarrollo/datos/cloud.
 STACK_CORE_NO_PRIMARIO = ("APIs REST", "C# (básico)")
 
@@ -92,12 +106,20 @@ DESC_STACK_AJENO_ESTRICTO = [
     "microstrategy", "odoo", "dynamics 365",
 ]
 
-# Exigencia de inglés avanzado / bilingüe (el CV de Santiago es B2 lectura técnica)
+# Exigencia de inglés avanzado / bilingüe. Santiago tiene B2: «intermedio», «intermedio-avanzado» y
+# «upper intermediate» alcanzan, así que no figuran acá.
 INGLES_AVANZADO = [
     "ingles avanzado", "ingles bilingue", "ingles fluido", "ingles nativo", "ingles c1", "ingles c2",
     "advanced english", "fluent english", "proficient english", "english proficient", "bilingual english",
-    "nivel de ingles avanzado", "ingles oral avanzado", "upper intermediate to advanced",
+    "nivel de ingles avanzado", "ingles oral avanzado",
+    "english c1", "english c2", "c1 english", "c2 english", "bilingue", "bilingual",
 ]
+
+# Rangos que arrancan en B2 («intermedio-avanzado», «upper intermediate to advanced»): se ignoran al buscar
+# exigencias de inglés avanzado, porque el piso del rango ya lo cubre B2.
+RANGO_B2_A_AVANZADO = re.compile(
+    r"(?:upper[- ]intermediate|intermediate|intermedio)\s*(?:-|/|to|a|o)\s*(?:advanced|avanzado)"
+)
 
 # Frases que indican que el aviso acepta explícitamente candidatos sin experiencia laboral formal
 ACEPTA_SIN_EXPERIENCIA = [
@@ -106,6 +128,22 @@ ACEPTA_SIN_EXPERIENCIA = [
     "aprendizaje autodidacta", "pasantia", "programa de pasantias", "jovenes profesionales",
 ]
 
+
+# Un remoto desde el exterior sólo sirve si el aviso dice que acepta Argentina / LATAM / cualquier lugar.
+ACEPTA_ARGENTINA = [
+    "argentina", "latam", "latinoamerica", "latin america", "anywhere", "worldwide",
+    "cualquier parte del mundo", "cualquier lugar del mundo",
+]
+
+# Exigencias de residencia o permiso de trabajo en otro país: excluyen aunque el puesto sea remoto.
+EXIGE_RESIDENCIA = [
+    "must reside", "must be located in", "residir en", "residentes en", "residencia en", "us citizen",
+    "us only", "u.s. citizen", "work authorization", "authorized to work in", "legally authorized",
+    "right to work in",
+]
+
+HIBRIDO = ["hibrido", "hybrid"]
+PRESENCIAL = ["presencial", "on-site", "onsite", "on site"]
 
 # Países y regiones fuera de Argentina a excluir estrictamente (incluso si dicen 'remoto')
 PAISES_EXTRANJEROS = [
@@ -142,6 +180,11 @@ def stack_core(cfg: dict) -> dict:
 def stack_ajeno(cfg: dict) -> list:
     """Términos del título que descartan la oferta, según config.json; si faltan, el default."""
     return cfg.get("perfil", {}).get("stack_ajeno") or TITULO_STACK_AJENO
+
+
+def puestos_objetivo(cfg: dict) -> dict:
+    """Puestos objetivo {nombre: [términos del título]} según config.json; si faltan, el default."""
+    return cfg.get("perfil", {}).get("puestos_objetivo") or PUESTOS_OBJETIVO
 
 
 @lru_cache(maxsize=2048)
@@ -261,8 +304,9 @@ def evaluate(job: dict, cfg: dict) -> dict:
 
     # 6. Años de experiencia o mención explícita de Semi Senior en la descripción
     years = years_required(desc)
-    if not exclude and years is not None and years >= 2:
+    if not exclude and years is not None and years >= 3:
         exclude = f"Exige {years}+ años de experiencia (buscás primer empleo / trainee / junior)"
+    aplica_igual = years == 2  # 2 años: no se excluye, se avisa que conviene postular igual
 
     if not exclude and any(k in desc for k in (
         "semi senior", "semisenior", "semi-senior", "perfil ssr", "desarrollador ssr", "programador ssr",
@@ -270,18 +314,28 @@ def evaluate(job: dict, cfg: dict) -> dict:
     )):
         exclude = "El texto del aviso indica perfil Semi Senior (SSR)"
 
-    # 7. Ubicación: estrictamente Argentina
-    far_foreign = find_term(f"{loc} {title}", PAISES_EXTRANJEROS)
-    if not exclude and far_foreign:
-        exclude = f"Oferta fuera de Argentina («{far_foreign.title()}»)"
+    # 7. Ubicación: Argentina. Un remoto desde el exterior se acepta si dice que admite Argentina/LATAM.
+    is_remote = bool(find_term(f"{loc} {modality} {title}", REMOTO))
+    es_hibrido_o_presencial = bool(find_term(full, HIBRIDO) or find_term(f"{loc} {modality} {title}", PRESENCIAL))
+    remoto_total = is_remote and not es_hibrido_o_presencial
 
+    pais_extranjero = find_term(f"{loc} {title}", PAISES_EXTRANJEROS)
     countries = extra.get("countries")
-    if not exclude and countries is not None:
-        if "Argentina" not in countries:
-            exclude = f"Oferta no radicada en Argentina ({', '.join(countries) if countries else 'Exterior'})"
+    fuera_de_argentina = bool(pais_extranjero) or (countries is not None and "Argentina" not in countries)
+    remoto_exterior = False
+    if not exclude and fuera_de_argentina:
+        lugar = pais_extranjero.title() if pais_extranjero else (", ".join(countries) or "Exterior")
+        residencia = find_term(full, EXIGE_RESIDENCIA)
+        if residencia:
+            exclude = f"Exige residir/trabajar en otro país («{residencia}», {lugar})"
+        elif not remoto_total:
+            exclude = f"Presencial/híbrido fuera de Argentina ({lugar})"
+        elif not find_term(full, ACEPTA_ARGENTINA):
+            exclude = f"Remoto desde el exterior sin aclarar que acepta Argentina/LATAM ({lugar})"
+        else:
+            remoto_exterior = True
 
     # 8. Presencial o híbrido fuera de Buenos Aires (CABA / GBA)
-    is_remote = bool(find_term(f"{loc} {modality} {title}", REMOTO))
     if not exclude and not is_remote:
         far_local = find_term(loc, PROVINCIAS_LEJANAS)
         if far_local:
@@ -289,7 +343,7 @@ def evaluate(job: dict, cfg: dict) -> dict:
 
     # 9. Inglés avanzado / bilingüe o aviso íntegro en inglés (contractor exterior)
     if not exclude:
-        hit_eng = find_term(full, INGLES_AVANZADO)
+        hit_eng = find_term(RANGO_B2_A_AVANZADO.sub(" ", full), INGLES_AVANZADO)
         if hit_eng:
             exclude = f"Exige inglés avanzado/bilingüe («{hit_eng}»; tu CV indica B2 lectura técnica)"
         elif _is_mostly_english(desc):
@@ -307,10 +361,10 @@ def evaluate(job: dict, cfg: dict) -> dict:
         if hit_strict_foreign and not any(k in matched_core for k in ("Node.js", "Express", "React", "Python", "Django")):
             exclude = "Pide stack que no manejás (" + ", ".join(hit_strict_foreign[:3]) + ")"
 
-    if not exclude and desc and not has_primary_dev_stack:
-        # Solo dejar pasar sin stack explícito si es explícitamente pasantía / trainee para estudiantes de sistemas
-        if not any(w in full for w in ("pasante", "pasantia", "trainee", "estudiante de sistemas", "estudiantes de sistemas", "jovenes profesionales")):
-            exclude = "No menciona tecnologías de tu CV (JS, Node, React, Python, SQL, Datos, Cloud)"
+    # Regla de portfolio: tiene que mencionar tecnología de tu stack core o encajar con uno de tus puestos objetivo
+    puesto = next((n for n, terms in puestos_objetivo(cfg).items() if find_term(title, terms)), None)
+    if not exclude and desc and not has_primary_dev_stack and not puesto:
+        exclude = "No menciona tecnologías de tu stack ni encaja con tus puestos objetivo (Desarrollo, Datos/BI, Cloud)"
 
     # ---------- puntaje ----------
     score = 35
@@ -329,8 +383,11 @@ def evaluate(job: dict, cfg: dict) -> dict:
         score += 10
         add(10, "Acepta experiencia académica / proyectos / primer empleo")
 
-    if years is not None and years == 1:
+    if years == 1:
         add(0, "Piden hasta 1 año de experiencia (podés postular con tus proyectos)")
+    elif aplica_igual:
+        score -= 10
+        add(-10, "Piden 2 años de experiencia: aplicá igual, destacando tus proyectos")
 
     if matched_core:
         pts = min(35, 7 * len(matched_core))
@@ -355,6 +412,9 @@ def evaluate(job: dict, cfg: dict) -> dict:
     if is_remote:
         score += 10
         add(10, "Modalidad remota")
+    if remoto_exterior:
+        score -= 5
+        add(-5, "Remoto desde el exterior (acepta Argentina/LATAM)")
     if find_term(loc, f["zona_sur"]):
         score += 15
         add(15, "En Zona Sur, cerca tuyo")
@@ -375,5 +435,6 @@ def evaluate(job: dict, cfg: dict) -> dict:
     score = max(0, min(100, score))
     if exclude:
         reasons.insert(0, {"p": None, "t": "Filtrada: " + exclude})
-    return {"score": score, "reasons": reasons, "excluded": bool(exclude),
-            "exclude_reason": exclude, "matched_stack": matched}
+    etiqueta = None if exclude else ("aplicá igual" if aplica_igual else "encaja")
+    return {"score": score, "reasons": reasons, "excluded": bool(exclude), "exclude_reason": exclude,
+            "matched_stack": matched, "etiqueta": etiqueta}
