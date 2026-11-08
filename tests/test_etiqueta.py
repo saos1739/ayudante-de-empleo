@@ -6,6 +6,7 @@ import sqlite3
 from radar import db, scoring
 from radar.config import load_config
 from radar.notifiers import email as canal_email
+from radar.notifiers import formato
 from tests.helpers import guardar, oferta
 
 DESC = "Perfil junior con JavaScript y React. "
@@ -48,12 +49,12 @@ def test_el_mail_no_inventa_etiqueta_en_ofertas_viejas(base):
     with sqlite3.connect(base) as conn:
         conn.execute("UPDATE jobs SET etiqueta = NULL WHERE id = ?", (job_id,))
     fila = db.get_job(job_id)
-    assert canal_email._etiqueta(fila) == ""
+    assert formato.etiqueta(fila) == ""
     assert "encaja" not in canal_email._job_text(fila).split("\n")[0]
 
 
 def test_motivos_a_favor_siguen_limitados_a_tres(base):
     fila = db.get_job(guardar(DESC))
-    a_favor = [m for m in canal_email._reasons(fila) if not m.startswith("⚠")]
+    a_favor = [m for m in formato.motivos(fila) if not m.startswith("⚠")]
     assert 0 < len(a_favor) <= 3
     assert json.loads(fila["rule_reasons"])

@@ -1,6 +1,5 @@
 """Canal de correo: resumen diario con las ofertas nuevas que encajan con el perfil (Gmail SMTP)."""
 
-import json
 import os
 import smtplib
 import ssl
@@ -11,6 +10,7 @@ from html import escape
 
 from ..config import destinatario
 from .base import Notificador, Resultado
+from .formato import etiqueta, motivos, puntaje
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
@@ -55,43 +55,23 @@ def _send(to: str, subject: str, html: str, text: str) -> None:
         s.send_message(msg)
 
 
-def _score(job) -> int:
-    return job["ai_score"] if job["ai_score"] is not None else job["rule_score"]
-
-
-def _etiqueta(job) -> str:
-    """«encaja» o «aplicá igual»; vacía en ofertas guardadas antes de la v2 hasta que se recalculen."""
-    return job["etiqueta"] or ""
-
-
-def _reasons(job, limit: int = 3) -> list:
-    """Los mejores motivos a favor y, aparte, todas las advertencias (penalizaciones) marcadas con ⚠."""
-    try:
-        items = json.loads(job["rule_reasons"] or "[]")
-    except ValueError:
-        return []
-    a_favor = [r["t"] for r in items if (r.get("p") or 0) > 0][:limit]
-    advertencias = [f"⚠ {r['t']}" for r in items if (r.get("p") or 0) < 0]
-    return a_favor + advertencias
-
-
 def _etiqueta_html(job) -> str:
-    etiqueta = _etiqueta(job)
-    if not etiqueta:
+    texto = etiqueta(job)
+    if not texto:
         return ""
-    colores = "background:#fef3c7;color:#92400e" if etiqueta == "aplicá igual" else "background:#dbeafe;color:#1e40af"
+    colores = "background:#fef3c7;color:#92400e" if texto == "aplicá igual" else "background:#dbeafe;color:#1e40af"
     return (f'<span style="display:inline-block;padding:2px 8px;margin-left:6px;border-radius:6px;'
-            f'{colores};font-size:12px;font-weight:600">{escape(etiqueta)}</span>')
+            f'{colores};font-size:12px;font-weight:600">{escape(texto)}</span>')
 
 
 def _job_html(job) -> str:
     meta = " · ".join(escape(x) for x in (job["company"], job["location"], job["modality"], job["salary"]) if x)
-    reasons = "".join(f"<li>{escape(r)}</li>" for r in _reasons(job))
+    reasons = "".join(f"<li>{escape(r)}</li>" for r in motivos(job))
     return f"""
     <tr><td style="padding:14px 0;border-bottom:1px solid #e5e7eb">
       <div style="font-size:16px;font-weight:600;color:#111827">
         <span style="display:inline-block;min-width:38px;padding:2px 6px;margin-right:6px;border-radius:6px;
-              background:#dcfce7;color:#166534;font-size:13px;text-align:center">{_score(job)}</span>
+              background:#dcfce7;color:#166534;font-size:13px;text-align:center">{puntaje(job)}</span>
         {escape(job["title"])}
         {_etiqueta_html(job)}
       </div>
@@ -105,9 +85,9 @@ def _job_html(job) -> str:
 
 def _job_text(job) -> str:
     meta = " · ".join(x for x in (job["company"], job["location"], job["modality"], job["salary"]) if x)
-    reasons = "\n".join(f"   - {r}" for r in _reasons(job))
-    etiqueta = f" ({_etiqueta(job)})" if _etiqueta(job) else ""
-    return f"[{_score(job)}]{etiqueta} {job['title']}\n   {meta} ({job['source']})\n{reasons}\n   {job['url']}\n"
+    reasons = "\n".join(f"   - {r}" for r in motivos(job))
+    marca = f" ({etiqueta(job)})" if etiqueta(job) else ""
+    return f"[{puntaje(job)}]{marca} {job['title']}\n   {meta} ({job['source']})\n{reasons}\n   {job['url']}\n"
 
 
 class EmailNotificador(Notificador):

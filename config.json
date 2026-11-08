@@ -557,9 +557,16 @@
     "puntaje_minimo_para_ia": 50
   },
   "notificaciones": {
+    "canales": [
+      "email",
+      "whatsapp"
+    ],
     "email_habilitado": true,
     "hora_resumen": 8,
     "puntaje_minimo_email": 60,
-    "enviar_si_no_hay_novedades": true
+    "enviar_si_no_hay_novedades": true,
+    "whatsapp_proveedor": "callmebot",
+    "whatsapp_max_caracteres": 900,
+    "whatsapp_pausa_seg": 5
   }
 }

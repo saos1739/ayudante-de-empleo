@@ -11,10 +11,12 @@ from .. import db
 from ..config import load_config
 from .base import Notificador, Resultado
 from .email import EmailNotificador
+from .whatsapp import WhatsAppNotificador
 
 # Para sumar un canal nuevo: implementar `Notificador` y registrarlo acá.
 CANALES: dict[str, type[Notificador]] = {
     "email": EmailNotificador,
+    "whatsapp": WhatsAppNotificador,
 }
 
 CANALES_POR_DEFECTO = ["email"]
@@ -86,6 +88,9 @@ def send_digest(force: bool = False, log=print) -> dict:
         resultados.append(resultado)
         if resultado.enviado:
             log(f"{notificador.nombre}: resumen enviado con {len(resultado.ids_avisados)} ofertas.")
+            if resultado.motivo != "ok":  # llegó, pero incompleto
+                log(f"⚠ {notificador.nombre}: {resultado.motivo}")
+                errores.append(f"{notificador.nombre}: {resultado.motivo}")
 
     llegaron = [r for r in resultados if r.enviado]
     if not llegaron:

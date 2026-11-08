@@ -3,6 +3,7 @@
     python -m radar buscar       busca ofertas una vez
     python -m radar resumen      busca y envía el resumen diario por correo (si no se envió hoy)
     python -m radar probar-mail  envía un correo de prueba
+    python -m radar probar-whatsapp  envía un mensaje de prueba por WhatsApp
     python -m radar recalcular   recalcula puntajes tras cambiar filtros
 """
 
@@ -33,6 +34,15 @@ def main() -> None:
         from . import notifiers
         notifiers.send_test("email")
         print("Correo de prueba enviado.")
+    elif cmd == "probar-whatsapp":
+        from . import notifiers
+        from .notifiers.whatsapp import WhatsAppError
+        try:
+            notifiers.send_test("whatsapp")
+        except WhatsAppError as e:
+            print(f"No se pudo enviar el mensaje de prueba: {e}")
+            sys.exit(1)
+        print("Mensaje de prueba enviado: revisá tu WhatsApp.")
     elif cmd == "recalcular":
         from . import db, runner
         db.init_db()
