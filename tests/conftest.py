@@ -40,3 +40,13 @@ def sin_internet(monkeypatch):
     monkeypatch.setattr(socket.socket, "connect", bloqueado)
     monkeypatch.setattr(socket.socket, "connect_ex", bloqueado)
     monkeypatch.setattr(socket, "getaddrinfo", bloqueado)
+
+
+@pytest.fixture(autouse=True)
+def aislar_datos_reales(tmp_path, monkeypatch):
+    """Por defecto ningún test toca tu base ni tu estado de la nube: usan archivos temporales.
+
+    Los tests que necesitan su propia base (`base`) la pisan; esto cubre a los que se olvidan de pedirla.
+    """
+    monkeypatch.setenv("RADAR_DB", str(tmp_path / "aislada.db"))
+    monkeypatch.setenv("RADAR_ESTADO", str(tmp_path / "aislado" / "notificados.json"))

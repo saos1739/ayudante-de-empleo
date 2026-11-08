@@ -22,3 +22,12 @@ def test_los_pedidos_mockeados_siguen_funcionando(monkeypatch):
 
     monkeypatch.setattr(requests, "get", lambda *a, **k: Respuesta())
     assert requests.get("https://example.com").text == "ok"
+
+
+def test_la_suite_nunca_usa_la_base_real(monkeypatch):
+    """Guarda: sin pedir ninguna fixture, la base apunta a un archivo temporal y no a %LOCALAPPDATA%."""
+    from radar.config import db_path
+
+    ruta = str(db_path())
+    assert "RadarEmpleo" not in ruta
+    assert "pytest" in ruta.lower()
