@@ -567,8 +567,7 @@
   "notificaciones": {
     "modo": "local",
     "canales": [
-      "email",
-      "whatsapp"
+      "email"
     ],
     "email_habilitado": true,
     "hora_resumen": 8,
